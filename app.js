@@ -10,17 +10,19 @@ const jwtService = require("./services/jwt_services");
 const notice_model = require('./model/mongoose_models/notice_model');
 const noticeCategories = require('./model/data_helper_models/notice_top_categories.js');
 const noticeUseCases = require('./model/data_helper_models/notice_use_cases');
-const accountRoutes = require("./routes/account_routes");
 const notice_sizes = require('./model/data_helper_models/notice_sizes');
 const { ObjectId } = require('mongodb');
 const coupon_model = require('./model/mongoose_models/coupon_model');
 const couponExtents = require('./model/data_helper_models/coupon_extent.js');
 const env = require("dotenv").config();
+const uuid = require('uuid');
+const user_model = require('./model/mongoose_models/user_model');
 
 // routes
 const  errorsMiddleware  = require('./controllers/error_handler_controller').errorsMiddleware;
 const authenticationRoutes = require("./routes/authentication_routes");
-const user_model = require('./model/mongoose_models/user_model');
+const accountRoutes = require("./routes/account_routes");
+const noticeRoutes = require("./routes/notice_routes");
 //middlewares
 const app = express();
 app.use(express.urlencoded({extended:false}));
@@ -32,9 +34,12 @@ app.use((req, res, next) => {
   next();
 })
 
+
 // routers
 app.use("/auth",authenticationRoutes);
-app.use("/account", jwtService.validateJwt,accountRoutes)
+app.use("/account", jwtService.validateJwt,accountRoutes);
+app.use("/notice", jwtService.validateJwt, noticeRoutes);
+
 
 app.use(errorsMiddleware);
 mongoose.connect(process.env.MONGODB_URL).then((connection)=>{

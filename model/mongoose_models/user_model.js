@@ -2,6 +2,7 @@ const mongoose = require('mongoose');
 const offerStates = require('../data_helper_models/offer_states');
 const addressSchema = require("./address_model");
 const sizes_model = require('./sizes_model');
+const soldNoticeModel = require("./taken_notice_model");
 
 const userSchema = new mongoose.Schema({
   // credit card informations will be added later"
@@ -110,6 +111,17 @@ const userSchema = new mongoose.Schema({
     },
     default: [],
   }],
+  taken_notices: {
+    type: [mongoose.SchemaTypes.ObjectId],
+    ref: "sold_notice",
+    default: [],
+  },
+  sold_notices: {
+    type: [mongoose.SchemaTypes.ObjectId],
+    ref: "sold_notice",
+    default: [],
+  },
+
 })
 
 module.exports= mongoose.model("user", userSchema, "users");

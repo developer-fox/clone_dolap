@@ -2,3 +2,7 @@
 * credit card processes
 * frequency asked questions processes
 * dolap support channel
+* featureds
+* notice detail_categories js object writing
+* photo processes
+* advanced error handling

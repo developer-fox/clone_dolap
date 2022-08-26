@@ -1,6 +1,7 @@
 
 const express = require("express");
 const { ObjectId } = require("mongodb");
+const brandsList = require("../model/data_helper_models/brands.json");
 const { default: mongoose } = require("mongoose");
 const feedback_reasons = require("../model/data_helper_models/feedback_reasons");
 const feedback_subjects = require("../model/data_helper_models/feedback_subjects");
@@ -9,6 +10,7 @@ const feedback_model = require("../model/mongoose_models/feedback_model");
 const user_model = require("../model/mongoose_models/user_model");
 const validator = require("validator").default;
 const { sendJsonWithTokens } = require("../services/response_sendjson");
+const soldNoticeModel = require("../model/mongoose_models/taken_notice_model");
 
 const router = express.Router();
 
@@ -168,6 +170,12 @@ router.post("/add_brands", async (req, res, next)=>{
   if(!new_brands){
     return next(new Error("Invalid brands information"));
   }
+    
+  new_brands.forEach((element)=>{
+    if(!Object.values(brandsList).includes(element)){
+      return next(new Error(`undefined brand ${element}`));
+    }
+  })
 
   try {
 	  const result = await user_model.updateOne({email: req.decoded.email}, {$push: {brands: new_brands}});
@@ -347,6 +355,18 @@ router.post("/send_feedback", async (req, res, next)=>{
 router.get("/get_feedbacks", async (req, res, next)=>{
   const result = await user_model.findById(req.decoded.id).select("feedbacks -_id").populate("feedbacks");
   return res.send(sendJsonWithTokens(req,result.feedbacks));
+})
+
+router.get("/get_taken_notices", async (req, res, next)=>{
+
+  try {
+    const result = await user_model.findById(req.decoded.id).select("taken_notices -_id");
+    console.log(result);
+    return res.send(sendJsonWithTokens(req,result));
+  } catch (error) {
+    
+  }
+
 })
 
 module.exports = router;

@@ -1,6 +1,8 @@
 
 const mongoose = require('mongoose');
+const noticeQuestionsModel = require('./notice_questions_model');
 const offerStates = require('../data_helper_models/offer_states');
+const noticeStates = require('../data_helper_models/notice_states');
 
 const noticeShema = new mongoose.Schema({
   title: {
@@ -19,6 +21,7 @@ const noticeShema = new mongoose.Schema({
           top_category: {type: String, required: true},
           medium_category: {type: String, required: true},
           bottom_category: {type: String, required: true},
+          detail_category: {type: String, required: true},
         },
         required: true,
       },
@@ -29,10 +32,7 @@ const noticeShema = new mongoose.Schema({
         type: String,
         required: true,
       },
-      size: {
-        type: String,
-        required: true,
-      },
+      size: {type: String,},
       color:{
         type: String,
         required: true,
@@ -51,35 +51,17 @@ const noticeShema = new mongoose.Schema({
       type: {
         buying_price: {type: Number, required: true},
         saling_price: {type: Number, required: true},
-        selling_with_offer : {type: Boolean, required: true}
+        selling_with_offer : {type: Boolean, required: true},
       }
     },
     photos: {
       type: [{type: String, required: true}],
     },
-    is_sold:{type: Boolean, default: false},
+    state:{type: String, default: noticeStates.awaitConfirmation},
     saler_user:{type: mongoose.SchemaTypes.ObjectId, ref: "user", required: true},
     favorites_count: {type: Number, default: 0},
     created_date: {type: mongoose.SchemaTypes.Date, required: true},
-    notice_questions: [
-      {
-        type: {
-          question: {
-            type: {
-              date: {type: Date, required: true},
-              user: {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "user"},
-              content: {type: String, required: true},
-            }  
-          },
-          answer:  {
-            date: {type: Date},
-            user: {type: mongoose.SchemaTypes.ObjectId,  ref: "user"},
-            content: {type: String},
-          }
-        },
-        default: [],
-      }
-    ],
+    notice_questions: [noticeQuestionsModel],
     offers: [{
       type: {
         proposer : {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "user"},

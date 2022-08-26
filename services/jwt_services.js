@@ -16,7 +16,7 @@ module.exports.validateJwt = async (req,res,next) => {
   else{
     // verifying token
     try {
-	    const decoded = jwt.verify(token,process.env.JWT_SECRET_KEY);
+	    const decoded = jwt.verify(token ,process.env.JWT_SECRET_KEY);
       req.decoded = decoded;
       return next();
     } catch (error) {

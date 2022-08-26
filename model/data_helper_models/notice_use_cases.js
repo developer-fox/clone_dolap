@@ -1,6 +1,6 @@
 
 module.exports= {
-  azKullanilmis: "Az Kullnılmış",
+  azKullanilmis: "Az Kullanılmış",
   yeni: "Yeni",
   yeniVeEtiketli: "Yeni & Etiketli",
 }
