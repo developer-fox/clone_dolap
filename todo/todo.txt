@@ -6,3 +6,4 @@
 * notice detail_categories js object writing
 * photo processes
 * advanced error handling
+* user tagging 
