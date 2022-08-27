@@ -75,17 +75,6 @@ const userSchema = new mongoose.Schema({
     },
     default: [],
   }],
-  saling_offers: [{
-    type: {
-      remaining_time: {type: mongoose.SchemaTypes.Date, required: true},
-      price: {type: Number, required: true},
-      notice: {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "notice"},
-      state: {type:String, default: offerStates.pending},
-    },
-    default: [],
-  },
-
-  ],
   brands: [{type: String, default: []}],
   sizes: {
     type: [{

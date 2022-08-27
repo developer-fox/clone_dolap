@@ -1,6 +1,7 @@
 
 const express = require('express');
 const noticeModel = require('../model/mongoose_models/notice_model');
+const userModel = require('../model/mongoose_models/user_model');
 const brands = require('../model/data_helper_models/brands.json');
 const useCases = require('../model/data_helper_models/notice_use_cases');
 const colors = require('../model/data_helper_models/colors');
@@ -9,7 +10,9 @@ const cargo_payers = require('../model/data_helper_models/cargo_payers');
 const user_model = require('../model/mongoose_models/user_model');
 const { sendJsonWithTokens } = require('../services/response_sendjson');
 const { isValidObjectId } = require('mongoose');
+const noticeReportModel = require('../model/mongoose_models/notice_report_model.js');
 
+const commentsRouter = require("./comment_routes");
 const router = express.Router();
 
 router.post("/add_notice", async (req, res, next)=>{
@@ -87,134 +90,115 @@ router.post("/add_notice", async (req, res, next)=>{
 
 })
 
-router.post("/add_comment",  async (req, res, next)=>{
+router.use("/comment", commentsRouter);
 
-  const notice_id = req.body.notice_id;
-  const content = req.body.content;
+router.post("/add_to_favorites", async (req, res, next)=>{
+  const notice_id= req.body.notice_id;
 
   if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
 
-  if(!isValidObjectId(notice_id)){
-    return next(new Error("invalid notice id data"));
-  }
-
-  if(!content || content.length<1){
-    return next(new Error("content cannot be empty"));
-  }
-  
   try {
-	  const notice = await noticeModel.findById(notice_id);
-    if(!notice._id){
-      return next(new Error("notice not found"));
+    const user = await userModel.findById(req.decoded.id).select("favorites");
+    if(user.favorites.includes(notice_id)){
+      return next(new Error("the notice is already in favorites"));
+    }
+    const result =  await userModel.findByIdAndUpdate(req.decoded.id, {$addToSet: {favorites:notice_id}}, {new: true});
+    
+    await noticeModel.findByIdAndUpdate(notice_id, {$inc: {favorites_count: 1}, $addToSet: {favorited_users: req.decoded.id}});
+
+    if(result.favorites.includes(notice_id)) {
+      return res.send(sendJsonWithTokens(req,"successfuly"));
+    }
+    else {
+      return next(new Error("an error detected when new notice adding to favorites"));
+    }  
+  } catch (error) {
+    return next(error);
+  }
+
+})
+
+router.post("/report_notice" , async (req, res, next)=>{
+  const notice_id = req.body.notice_id;
+  const report_category = req.body.report_category;
+  const report_detail = req.body.report_detail;
+
+  if(!notice_id || !isValidObjectId(notice_id)) return next(new Error("invalid notice information"));
+  if(!report_category) return next(new Error("invalid report category"));
+  if(!report_detail) return next(new Error("invalid report detail"));
+
+  const new_report = new noticeReportModel({
+    notice: notice_id,
+    reporter_user: req.decoded.id,
+    report_category: report_category,
+    report_detail: report_detail,
+    report_date: new Date(),
+  })
+
+  try {
+    const result =  await new_report.save();
+    if(!result._id) return next(new Error("report cannot send"));
+    return res.send(sendJsonWithTokens(req, "successfuly"));
+  } catch (error) {
+    return next(error);
+  }
+
+})
+
+router.get("/notice_details",async (req, res, next)=>{
+  const notice_id = req.body.notice_id;
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+
+  const notice = await noticeModel.findById(notice_id).select("-price_details.buying_price -offers ").populate("saler_user","profile_photo username is_validated saler_score last_seen").populate("favorited_users", "profile_photo username");
+  return res.send(sendJsonWithTokens(req, notice));
+
+})
+
+router.post("/give_offer",async (req, res, next)=>{
+  const notice_id = req.body.notice_id;
+  const price = req.body.price;
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(!price || price<1) return next(new Error("price cannot be empty"));
+
+  try {
+	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price price_details.selling_with_offer offers");
+
+    if(!notice._id) return next(new Error("notice not found"));
+    if(!notice.price_details.selling_with_offer) return next(new Error("you cant give offer for this notice")); 
+    if(price< (notice.price_details.saling_price)*(7/10)) return next(new Error("very low price for this notice"));
+
+    for(let i of notice.offers){
+      if(i.proposer == req.decoded.id){
+        return next(new Error("already you gave an offer"));
+      }
     }
 
-    notice.notice_questions.push({
-	    question: {
-	        date: new Date(),
-	        user: req.decoded.id,
-	        content: content,
-	    },
-	    }
-	  );
-	  await notice.save();
+    const remaining_time = new Date();
+    const addOfferToNoticeOffers = await noticeModel.findByIdAndUpdate(notice_id, {$addToSet: {offers: {
+      proposer: req.decoded.id,
+      remaining_time: remaining_time,
+      offer_price : price,
+    }}},{new: true})
+
+    const addOfferToProposerUserOfferes = await userModel.findByIdAndUpdate(req.decoded.id, {$addToSet: {
+      buying_offers: {
+        remaining_time: remaining_time,
+        price: price,
+        notice: notice_id,
+      }
+    }})
+
     return res.send(sendJsonWithTokens(req,"successfuly"));
-  } catch (error) {
-    return next(error);
-  }
 
-});
-
-router.post("/add_answer",  async (req, res, next)=>{
-  const notice_id = req.body.notice_id;
-  const comment_id = req.body.comment_id;
-  const content = req.body.content;
-
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!comment_id) return next(new Error("comment id cannot be empty"));
-  if(!isValidObjectId(comment_id)) return next(new Error("invalid comment id"));
-  if(!content || content.length<1) return next(new Error("content cannot be empty"));
-
-  try {
-	  const notice = await noticeModel.findById(notice_id);
-	  if(!notice) return next(new Error("notice not found"));
-	  const comment = notice.notice_questions.id(comment_id);
-	  if(!comment) return next(new Error("comment not found"));
-	
-	  comment.answers.push( { 
-	    date: new Date(),
-	    user: req.decoded.id,
-	    content: content,
-	  })
-	  await notice.save();
-	  return res.send(sendJsonWithTokens(req,"successfuly"));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.get("/get_comments", async (req, res, next)=>{
-  const notice_id = req.body.notice_id;
-
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-
-  try {
-    const comments = await noticeModel.findById(notice_id).select("notice_questions -_id");
-    if(!comments) return next(new Error("invalid comments taken"));
-    return res.send(sendJsonWithTokens(req, comments));
   } catch (error) {
     return next(error);
   }
 
 })
 
-router.delete("/delete_comment",  async (req, res, next)=>{
-  const notice_id = req.body.notice_id;
-  const comment_id = req.body.comment_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!comment_id) return next(new Error("comment id cannot be empty"));
-  if(!isValidObjectId(comment_id)) return next(new Error("invalid comment id"));
 
-  try {
-    const notice = await noticeModel.findById(notice_id).select("notice_questions");
-    const comment = notice.notice_questions.id(comment_id);
-    if(comment.question.user != req.decoded.id) return next(new Error("authorization fail"));
-    const result = await noticeModel.findByIdAndUpdate(notice_id, {$pull: {
-      notice_questions: {"_id": comment_id},
-    }});
-    return res.send(sendJsonWithTokens(req,"successfuly"));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.delete("/delete_answer", async (req, res, next)=>{
-  const notice_id = req.body.notice_id;
-  const comment_id = req.body.comment_id;
-  const answer_id = req.body.answer_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!comment_id) return next(new Error("comment id cannot be empty"));
-  if(!isValidObjectId(comment_id)) return next(new Error("invalid comment id"));
-  if(!answer_id) return next(new Error("answer id cannot be empty"));
-  if(!isValidObjectId(answer_id)) return next(new Error("invalid answer id"));
-
-  try {
-	  const notice = await noticeModel.findById(notice_id).select("notice_questions");
-    if(!notice) return next(new Error("notice not found"));
-    const answer = notice.notice_questions.id(comment_id).answers.id(answer_id);
-    if(!answer) return next(new Error("answer not found"));
-    if(answer.user != req.decoded.id) return next(new Error("authorization fail"));
-    answer.remove();
-    await notice.save();
-    return res.send(sendJsonWithTokens(req,"successfuly"));
-  } catch (error) {
-    return next(error);
-  }
-
-
-})
 
 module.exports = router;

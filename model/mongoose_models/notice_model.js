@@ -60,11 +60,18 @@ const noticeShema = new mongoose.Schema({
     state:{type: String, default: noticeStates.awaitConfirmation},
     saler_user:{type: mongoose.SchemaTypes.ObjectId, ref: "user", required: true},
     favorites_count: {type: Number, default: 0},
+    favorited_users: {
+      type: [mongoose.SchemaTypes.ObjectId],
+      default: [],
+      ref: "user"
+    },
     created_date: {type: mongoose.SchemaTypes.Date, required: true},
+    is_updated: {type: Boolean, default: false},
     notice_questions: [noticeQuestionsModel],
     offers: [{
       type: {
         proposer : {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "user"},
+        remaining_time: {type: mongoose.SchemaTypes.Date, required: true},
         offer_price: {type: Number, required: true},
         offer_state: {type: String, default: offerStates.pending},
       },
