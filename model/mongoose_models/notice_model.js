@@ -57,6 +57,7 @@ const noticeShema = new mongoose.Schema({
     photos: {
       type: [{type: String, required: true}],
     },
+    profile_photo: {type: String, required: true},
     state:{type: String, default: noticeStates.awaitConfirmation},
     saler_user:{type: mongoose.SchemaTypes.ObjectId, ref: "user", required: true},
     favorites_count: {type: Number, default: 0},
@@ -77,6 +78,9 @@ const noticeShema = new mongoose.Schema({
       },
       default: [],
     }],
+    offers_count: {type: Number, default: 0},
+    displayed_count : {type: Number, default: 0},
+    is_featured: {type: Boolean, default: false},
 });
 
 module.exports = mongoose.model("notice", noticeShema, "notices");

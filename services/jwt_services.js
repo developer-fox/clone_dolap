@@ -41,7 +41,7 @@ module.exports.validateJwt = async (req,res,next) => {
 
 module.exports.createJwtToken = (username, email, id)=>{
   // creating jsw token and hold username and email (expires 1 minute)
-  const token = jwt.sign({username: username, email: email, id: id},process.env.JWT_SECRET_KEY,{expiresIn: ms('3h')})
+  const token = jwt.sign({username: username, email: email, id: id},process.env.JWT_SECRET_KEY,{expiresIn: "3h"})
   //creating jsw refresh token and for 5 days
   const refreshToken = jwt.sign({username: username, email: email, id: id}, process.env.JWT_REFRESH_SECRET_KEY, {expiresIn: "5d"});
   return {refresh_token: refreshToken, jwt_token: token};
@@ -50,7 +50,7 @@ module.exports.createJwtToken = (username, email, id)=>{
 module.exports.createNewJwtTokenWithRefreshToken = async (refreshToken)=>{
   try {
 	  const validatingRefreshToken = jwt.verify(refreshToken,  process.env.JWT_REFRESH_SECRET_KEY,);
-    const newToken = jwt.sign({username: validatingRefreshToken.username, email: validatingRefreshToken.email, id: validatingRefreshToken.id},process.env.JWT_SECRET_KEY, {expiresIn: ms('3h')});
+    const newToken = jwt.sign({username: validatingRefreshToken.username, email: validatingRefreshToken.email, id: validatingRefreshToken.id},process.env.JWT_SECRET_KEY, {expiresIn: "3h"});
     return newToken;
   } catch (error) {
     if(error.message == error_messages.expiredJwtToken){

@@ -21,16 +21,19 @@ const userSchema = new mongoose.Schema({
     default: [],
     ref: "user",
   }],
+  followers_count : {type: Number, default: 0},
   follows: [{ 
     type: mongoose.SchemaTypes.ObjectId,
     default: [],
     ref: "user",
   }],
+  follows_count : {type: Number, default: 0},
   favorites: [{
     type: mongoose.SchemaTypes.ObjectId,
     default: [],
     ref: "notice",
   }],
+  favorites_count: {type: Number, default: 0},
   sales: [{
     type: mongoose.SchemaTypes.ObjectId,
     ref: "notice",
@@ -39,19 +42,27 @@ const userSchema = new mongoose.Schema({
   is_credible_saler :{type: Boolean, default: false},
   saler_score: {type: Number, required: false},
   last_seen: {type: Date},
-  ratings: [
-    {
-      type: {
+  ratings: {
+    type: [
+      {
         rater_user: {type: mongoose.SchemaTypes.ObjectId, required: true, ref:"user"},
+        rating_notice: {type: mongoose.SchemaTypes.ObjectId, required:true, ref: "notice"},
         rate_date: {type: Date,required: true},
-        rating_content: {type: String, required: true},
+        rating_content: {type: String, required: false},
         saler_answer: {type: String, required: false, },
-        rating: {type: Number, required: true},
+        total_rating: {type: Number, required: true},
+        rating_details: {
+          communication_rate: {type: Number, required: true},
+          validity_rate: {type: Number, required: true},
+          packing_rate : {type: Number, required: true},
+        },
       },
-      default: [],
-    },
-  ],
+    ],
+    default: [],
+  },
+  ratings_count: {type: Number, default: 0},
   notices: [{type: mongoose.SchemaTypes.ObjectId, default: [], ref: "notice"},],
+  notices_count: {type: Number, default: 0, required: true},
   average_send_time: {type: Number, required: false},
   is_validated: {type: Boolean, default: false},
   enjoyed_campaings: [{
@@ -110,7 +121,13 @@ const userSchema = new mongoose.Schema({
     ref: "sold_notice",
     default: [],
   },
-
+  sold_notices_count: {type: Number, default: 0},
+  user_looked_notices: {
+    type: [mongoose.SchemaTypes.ObjectId],
+    default: [],
+    required: true,
+  },
+  homepage_notices: {type: [mongoose.SchemaTypes.ObjectId], ref:"notice"},
 })
 
 module.exports= mongoose.model("user", userSchema, "users");

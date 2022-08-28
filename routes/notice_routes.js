@@ -13,6 +13,9 @@ const { isValidObjectId } = require('mongoose');
 const noticeReportModel = require('../model/mongoose_models/notice_report_model.js');
 
 const commentsRouter = require("./comment_routes");
+const notice_states = require('../model/data_helper_models/notice_states');
+const { $where } = require('../model/mongoose_models/notice_model');
+const get_similar_notices = require('../controllers/get_similar_notices');
 const router = express.Router();
 
 router.post("/add_notice", async (req, res, next)=>{
@@ -61,6 +64,7 @@ router.post("/add_notice", async (req, res, next)=>{
     title: req.body.data.title,
     description: req.body.data.description,
     photos: req.body.data.photos,
+    profile_photo: req.body.data.photos[0],
     details: {
       category: req.body.data.category,
       brand: req.body.data.brand,
@@ -81,7 +85,7 @@ router.post("/add_notice", async (req, res, next)=>{
       return next(new Error("ürün satış için hazırlanırken hata oluştu."));
     }
     else{
-      const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {notices: access._id}});
+      const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {notices: access._id}, $inc: {notices_count: 1}});
       return res.send(sendJsonWithTokens(req, "successfuly"));
     }
   } catch (error) {
@@ -181,7 +185,9 @@ router.post("/give_offer",async (req, res, next)=>{
       proposer: req.decoded.id,
       remaining_time: remaining_time,
       offer_price : price,
-    }}},{new: true})
+    }},
+      $inc: {offers_count: 1},
+    },{new: true})
 
     const addOfferToProposerUserOfferes = await userModel.findByIdAndUpdate(req.decoded.id, {$addToSet: {
       buying_offers: {
@@ -199,6 +205,19 @@ router.post("/give_offer",async (req, res, next)=>{
 
 })
 
+router.get("/get_similar_notices", async (req, res, next)=>{
+  const notice_id = req.body.notice_id;
 
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+
+  try {
+    const result = await get_similar_notices(notice_id, "details.brand price_details.saling_price profile_photo", 4);
+    return res.send(sendJsonWithTokens(req,result));
+  } catch (error) {
+    return next(error);
+  }
+
+})
 
 module.exports = router;

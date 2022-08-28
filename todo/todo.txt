@@ -8,6 +8,4 @@
 * advanced error handling
 * user tagging 
 * timed processes
-* similar notices
-* other users routes
 * notifications
