@@ -18,7 +18,6 @@ const env = require("dotenv").config();
 const uuid = require('uuid');
 const user_model = require('./model/mongoose_models/user_model');
 const schedule = require("node-schedule");
-
 // routes
 const  errorsMiddleware  = require('./controllers/error_handler_controller').errorsMiddleware;
 const authenticationRoutes = require("./routes/authentication_routes");

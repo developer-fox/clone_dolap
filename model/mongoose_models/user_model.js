@@ -64,7 +64,8 @@ const userSchema = new mongoose.Schema({
   notices: [{type: mongoose.SchemaTypes.ObjectId, default: [], ref: "notice"},],
   notices_count: {type: Number, default: 0, required: true},
   average_send_time: {type: Number, required: false},
-  is_validated: {type: Boolean, default: false},
+  is_validated_with_phone: {type: Boolean, default: false},
+  is_validated_with_email: {type: Boolean, default: false},
   enjoyed_campaings: [{
     type: mongoose.SchemaTypes.ObjectId,
     default: [],
@@ -86,6 +87,15 @@ const userSchema = new mongoose.Schema({
     },
     default: [],
   }],
+
+  gotten_buying_offers: {
+    type: [{remaining_time: {type: mongoose.SchemaTypes.Date, required: true},
+    price: {type: Number, required: true},
+    notice: {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "notice"},
+    state: {type:String , default: offerStates.pending},
+    }]
+  },
+
   brands: [{type: String, default: []}],
   sizes: {
     type: [{
@@ -128,6 +138,20 @@ const userSchema = new mongoose.Schema({
     required: true,
   },
   homepage_notices: {type: [mongoose.SchemaTypes.ObjectId], ref:"notice"},
+  cart: {
+    type: {
+      items: [{
+        notice: {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "notice"},
+        total_price: {type: Number, required: true},
+        },],
+        details: [{
+        detail_id: {type: mongoose.SchemaTypes.ObjectId},
+        description: {type: String},
+        amount: {type: Number},
+        }]
+      },
+  },
+  cart_items_count: {type: Number, default: 0},
 })
 
 module.exports= mongoose.model("user", userSchema, "users");

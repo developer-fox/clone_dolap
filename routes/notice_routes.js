@@ -11,11 +11,13 @@ const user_model = require('../model/mongoose_models/user_model');
 const { sendJsonWithTokens } = require('../services/response_sendjson');
 const { isValidObjectId } = require('mongoose');
 const noticeReportModel = require('../model/mongoose_models/notice_report_model.js');
+const couponStates = require('../model/data_helper_models/coupon_states.js');
 
 const commentsRouter = require("./comment_routes");
 const notice_states = require('../model/data_helper_models/notice_states');
 const { $where } = require('../model/mongoose_models/notice_model');
 const get_similar_notices = require('../controllers/get_similar_notices');
+const offer_states = require('../model/data_helper_models/offer_states');
 const router = express.Router();
 
 router.post("/add_notice", async (req, res, next)=>{
@@ -180,11 +182,12 @@ router.post("/give_offer",async (req, res, next)=>{
       }
     }
 
-    const remaining_time = new Date();
+    const remaining_time = new Date(new Date().setDate(new Date().getDate() +1));
     const addOfferToNoticeOffers = await noticeModel.findByIdAndUpdate(notice_id, {$addToSet: {offers: {
       proposer: req.decoded.id,
       remaining_time: remaining_time,
       offer_price : price,
+      offer_type: "buy"
     }},
       $inc: {offers_count: 1},
     },{new: true})
@@ -218,6 +221,189 @@ router.get("/get_similar_notices", async (req, res, next)=>{
     return next(error);
   }
 
+})
+
+router.post("/add_to_cart", async (req, res, next)=>{
+  const notice_id = req.body.notice_id;
+  const price = req.body.price;
+
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(!price) return next(new Error("price cannot be empty"));
+  if(Number.isNaN(Number.parseFloat(price))) return next(new Error("price cannot be empty"));
+
+  try {
+	const notice = await noticeModel.findById(notice_id).select("price_details.saling_price  size_of_cargo payer_of_cargo").populate("saler_user","_id");
+  if(!notice) return next(new Error("notice not found"));
+	
+  const currentUser = await userModel.findById(req.decoded.id).select("gotten_buying_offers");
+  if(!currentUser) return next(new Error("user not found"));
+
+  if(price < notice.price_details.saling_price){
+    if(currentUser.gotten_buying_offers.length ==0){
+      return next(new Error("sent buying price from saler not found"));
+    } 
+    else{
+      currentUser.gotten_buying_offers.forEach(async offer =>{
+        if(offer.notice == notice_id){
+          if(offer.state != offer_states.accepted){
+            return next(new Error("offer not accepted"));
+          }
+          else{
+            if(price == offer.price){
+              await currentUser.update({
+                $addToSet: {
+                  //! distressing
+                  "cart.items":{
+                    notice: notice_id,
+                    total_price : price
+                  }, 
+                },
+                $inc: {
+                  cart_items_count: 1
+                }
+              })
+              return res.send(sendJsonWithTokens(req,"successfuly"));
+            }
+            else{
+              return next(new Error("wrong price information"));
+            }
+          }
+        }
+      });
+      return next(new Error("notice offer not found"));
+    }
+
+  }
+  else if(price == notice.price_details.saling_price){
+    await currentUser.update({
+      $addToSet: {
+        //! distressing
+        "cart.items":{
+          notice: notice_id,
+          total_price : price
+        }, 
+      },
+      $inc: {
+        cart_items_count: 1
+      }
+    });
+    return res.send(sendJsonWithTokens(req,"successfuly"));
+  }
+  else{
+    return next(new Error("wrong price information"));
+  }
+  } catch (error) {
+    return next(error);
+  }
+})
+
+router.get("/get_cart", async (req, res, next)=>{
+  try {
+	  const user = await userModel.findOne(req.decoded.id).select("cart cart_items_count").populate("cart.items.notice","profile_photo title details.use_case details.size").populate("cart.items.notice.saler_user", "profile_photo saler_score username");
+	  
+	  if(!user) return next(new Error("user not found"));
+	  const total_amount = 0;
+	  user.cart.items.forEach(element=>{
+	    total_amount += element.total_price;
+	  })
+	  user.cart.details.forEach(element=>{
+	    total_amount += element.amount;
+	  });
+	  return res.send(sendJsonWithTokens(req, {
+	    cart: user.cart,
+	    total_amount: total_amount,
+      cart_items_count: user.cart_items_count,
+	  }));
+  } catch (error) {
+    return next(error);
+  }
+})
+
+router.post("/use_coupon_code", async (req, res, next)=>{
+
+  const code = req.body.code;
+  if(!code) return next(new Error("code cannot be empty"));
+  try {
+	
+	  const user = await userModel.findById(req.decoded.id).select("user_coupons cart").populate("user_coupons.coupon");
+	
+	  if(!user) return next(new Error("user not found"));
+	
+	  user.user_coupons.forEach(async element =>{
+	    if(element.coupon.code == code && !(element.is_used_before) && element.coupon.state == couponStates.usable){
+        await user.update({
+          $addToSet: {
+            "cart.details": {
+              description: element.coupon.title,
+              amount: element.coupon.amount,
+              detail_id : element.coupon._id
+            }
+          }
+        });
+        return res.send(sendJsonWithTokens(req,"successfuly"));
+      }
+	  });
+
+    return next(new Error("coupon is not found"));
+  } catch (error) {
+	  return next(error);
+  }
+})
+
+router.delete("/pop_to_cart", async(req, res, next)=>{
+  const notice_id = req.body.notice_id;
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  try {
+	  const user = await userModel.findById(req.decoded.id).select("cart");
+	  if(!user) return next(new Error("user not found"));
+    user.cart.items.forEach(async item=>{
+      if(item.notice == notice_id){
+        await user.update({
+          $pull: {
+            "cart.items": {
+              "cart.items.notice" : notice_id
+            }
+          },
+          $inc: {
+            cart_items_count: -1
+          },
+        });
+        return res.send(sendJsonWithTokens(req,"successfuly"));
+      }
+    });
+    return next(new Error("notice is not found in your cart"));
+  } catch (error) {
+	  return next(error);
+  }
+})
+
+router.delete("/pop_coupon_code", async (req, res, next)=>{
+  const coupon_id = req.body.coupon_id;
+  if(!coupon_id) return next(new Error("coupon id cannot be empty"));
+  if(!isValidObjectId(coupon_id)) return next(new Error("invalid coupon id"));
+
+  try {
+	  const user = await userModel.findOne(req.decoded.id).select("cart");	
+	  if(!user) return next(new Error("user not found"));
+    
+    user.cart.details.forEach(async element => {
+      if(element.detail_id == coupon_id){
+        await user.update({
+          $pull: {
+            "cart.details":{
+              "cart.details.detail_id": coupon_id
+            }
+          }
+        });
+        return res.send(sendJsonWithTokens(req,"successfuly"));
+      }
+    });
+
+  } catch (error) {
+	  return next(error);
+  }
 })
 
 module.exports = router;

@@ -359,6 +359,60 @@ router.post("/decline_offer", async (req, res, next)=>{
   }
 })
 
+router.post("/send_saling_offer", async (req, res) => {
+  const notice_id = req.body.notice_id;
+  const offer_id = req.body.offer_id;
+  const buyer_id = req.body.buyer_id;
+  const price = req.body.price;
+  if(!price) return next(new Error("price cannot be empty"));
+  if(Number.isNaN(Number.parseFloat(price))) return next(new Error("price must be an number"));
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(!offer_id) return next(new Error("offer id cannot be empty"));
+  if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
+  if(!buyer_id) return next(new Error("buyer id cannot be empty"));
+  if(!isValidObjectId(buyer_id)) return next(new Error("invalid buyer id"));
+
+  try {
+    const notice = await noticeModel.findById(notice_id).select("offers");
+    if(!notice) return next(new Error("notice not found"));
+
+	  const buyer = await user_model.findById(buyer).select("buying_offers gotten_buying_offers");
+    if(!buyer) return next(new Error("user not found"));
+	  buyer.buying_offers.forEach(async offer =>{
+      if(offer.notice == notice_id){
+        if(offer.state != offer_states.declined){
+          return next(new Error("you cannot send saling offer"));
+        }
+        await buyer.update({
+          $addToSet: {
+            gotten_buying_offers: {
+              remaining_time: new Date(new Date().setDate(new Date().getDate() +1)),
+              price: price,
+              notice: notice_id,
+            }
+          }
+        });
+        await notice.update({
+          $addToSet: {
+            offers: {
+              proposer: req.decoded.id,
+              remaining_time: new Date(new Date().setDate(new Date().getDate() +1)),
+              offer_price: price,
+              offer_type: "sale",
+            }
+          }
+        })
+        return res.send(sendJsonWithTokens(req, "successfuly"));
+      }
+    });
+
+  } catch (error) {
+    return next(error);
+  }
+
+})
+
 router.post("/accept_offer", async (req, res, next)=>{
   const notice_id = req.body.notice_id;
   const offer_id = req.body.offer_id;

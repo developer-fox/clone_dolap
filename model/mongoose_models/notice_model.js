@@ -75,6 +75,7 @@ const noticeShema = new mongoose.Schema({
         remaining_time: {type: mongoose.SchemaTypes.Date, required: true},
         offer_price: {type: Number, required: true},
         offer_state: {type: String, default: offerStates.pending},
+        offer_type: {type: String, required: true},
       },
       default: [],
     }],

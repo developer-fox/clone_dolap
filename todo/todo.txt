@@ -1,11 +1,19 @@
-* email processes
-* credit card processes
-* frequency asked questions processes
-* dolap support channel
+* email actions
+* credit card actions
 * featureds
 * notice detail_categories js object writing
 * photo processes
 * advanced error handling
-* user tagging 
-* timed processes
+* timed actions
 * notifications
+* searching 
+* get related accounts
+* campaigns and coupons
+
+// signup actions
+/sms validation 6 numbers
+/email validation with link
+
+* application get starting
+* decline offer and send sale offer
+* an offers is usable in 24 hours
