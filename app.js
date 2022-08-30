@@ -18,6 +18,11 @@ const env = require("dotenv").config();
 const uuid = require('uuid');
 const user_model = require('./model/mongoose_models/user_model');
 const schedule = require("node-schedule");
+
+const multer = require("multer");
+const fs = require("fs");
+const path = require("path");
+
 // routes
 const  errorsMiddleware  = require('./controllers/error_handler_controller').errorsMiddleware;
 const authenticationRoutes = require("./routes/authentication_routes");
@@ -47,4 +52,6 @@ app.use(errorsMiddleware);
 mongoose.connect(process.env.MONGODB_URL).then((connection)=>{
   app.listen(process.env.PORT);
 })
-.catch((err)=> console.log(err));
+.catch((err)=>{
+  console.log(err);
+});

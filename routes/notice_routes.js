@@ -19,6 +19,8 @@ const { $where } = require('../model/mongoose_models/notice_model');
 const get_similar_notices = require('../controllers/get_similar_notices');
 const offer_states = require('../model/data_helper_models/offer_states');
 const router = express.Router();
+const fileService = require('../services/file_services');
+const { json } = require('express');
 
 router.post("/add_notice", async (req, res, next)=>{
 
@@ -27,9 +29,6 @@ router.post("/add_notice", async (req, res, next)=>{
   }
   if(!req.body.data.description){
     return next(new Error("invalid description type/length"));
-  }
-  if(req.body.data.photos.length <3){
-    return next(new Error("invalid photo count"));
   }
 
   if(!req.body.data.category || Object.keys(req.body.data.category).length<4){
@@ -65,8 +64,6 @@ router.post("/add_notice", async (req, res, next)=>{
   const newNotice = new noticeModel({
     title: req.body.data.title,
     description: req.body.data.description,
-    photos: req.body.data.photos,
-    profile_photo: req.body.data.photos[0],
     details: {
       category: req.body.data.category,
       brand: req.body.data.brand,
@@ -94,6 +91,24 @@ router.post("/add_notice", async (req, res, next)=>{
     return next(error);
   }
 
+})
+
+router.post("/create_notice_photos",fileService.uploadNoticeImages,async (req, res, next)=>{
+  const paths = req.files.notice_images.map((file)=>{
+    return file.path;
+  })
+
+  try {
+    const notice = await noticeModel.findById(req.notice_id).select("photos profile_photo");
+    await notice.updateOne({
+      $push: {photos: paths},
+      $set: {profile_photo: paths[0]}
+    });
+    return res.send(sendJsonWithTokens(req,"successfuly"));
+  } catch (error) {
+    return next(error);
+  }
+  
 })
 
 router.use("/comment", commentsRouter);
