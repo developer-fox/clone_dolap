@@ -14,8 +14,9 @@ const { sendJsonWithTokens } = require("../services/response_sendjson");
 const soldNoticeModel = require("../model/mongoose_models/taken_notice_model");
 const offer_states = require("../model/data_helper_models/offer_states");
 const get_similar_notices = require("../controllers/get_similar_notices");
-
+const fileService = require("../services/file_services");
 const router = express.Router();
+const fs = require("fs");
 
 router.get("/get_profile_info", async (req, res, next)=>{
   try {
@@ -24,6 +25,66 @@ router.get("/get_profile_info", async (req, res, next)=>{
   } catch (error) {
     return next(error);  
   }
+})
+
+router.post("/change_profile_photo", fileService.updateUserImage,async (req, res, next)=>{
+  const path =  req.filePath;
+  try {
+	  const user = await user_model.findById(req.decoded.id).select("profile_photo profile_photo_replace_count");
+	  if(!user) return next(new Error("user not found"));
+    if(user.profile_photo != ""){
+      await fs.rm(user.profile_photo, {recursive: true},err => {
+	      if (err) {
+	        throw err
+	      }
+	    });
+    }
+    await user.updateOne({
+      $set: {profile_photo: path},
+      $inc: {profile_photo_replace_count: 1}
+    },{new: true});
+
+    return res.send(sendJsonWithTokens(req,"successfuly"));
+  } catch (error) {
+    return next(error);
+  }  
+})
+
+router.delete("/delete_profile_photo",async(req, res, next) =>{
+
+  try {
+    const user = await user_model.findById(req.decoded.id).select("profile_photo profile_photo_replace_count");
+    if(!user) return next(new Error("user not found"));
+    if(user.profile_photo == "") return next(new Error("user already not have profile image"));
+
+    await fs.rm(user.profile_photo, {recursive: true},err => {
+      if (err) {
+        throw err
+      }
+    });
+    
+    await user.updateOne({
+      $set: {profile_photo: "",}
+    });
+    return res.send(sendJsonWithTokens(req,"successfuly"));
+  } catch (error) {
+    return next(error);
+  }
+
+})
+
+router.get("/get_user_profile_photo/:user_id", async (req, res, next)=>{
+  const user_id = req.params.user_id;
+  if(!user_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(user_id)) return next(new Error("invalid notice id"));
+  try {
+	  const user = await user_model.findById(user_id).select("profile_photo");
+    if(!user) return next(new Error("notice not found"));
+    if(user.profile_photo == "") return res.send(sendJsonWithTokens(req,{profile_photo: ""}));
+    return res.sendFile(process.env.rootPath +user.profile_photo);
+  } catch (error) {
+	  return next(error);
+  } 
 })
 
 router.post("/change_profile_info", async (req, res, next)=>{

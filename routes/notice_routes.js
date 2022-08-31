@@ -12,7 +12,7 @@ const { sendJsonWithTokens } = require('../services/response_sendjson');
 const { isValidObjectId } = require('mongoose');
 const noticeReportModel = require('../model/mongoose_models/notice_report_model.js');
 const couponStates = require('../model/data_helper_models/coupon_states.js');
-
+const fs = require("fs");
 const commentsRouter = require("./comment_routes");
 const notice_states = require('../model/data_helper_models/notice_states');
 const { $where } = require('../model/mongoose_models/notice_model');
@@ -99,16 +99,70 @@ router.post("/create_notice_photos",fileService.uploadNoticeImages,async (req, r
   })
 
   try {
-    const notice = await noticeModel.findById(req.notice_id).select("photos profile_photo");
+    const notice = await noticeModel.findById(req.notice_id).select("photos profile_photo photos_replaced_count");
     await notice.updateOne({
       $push: {photos: paths},
-      $set: {profile_photo: paths[0]}
+      $set: {profile_photo: paths[0]},
     });
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
   }
   
+})
+
+router.post("/update_notice_photos",fileService.updateNoticeImages,async(req, res, next)=>{
+  let notice_id = req.body.notice_id;
+  notice_id = JSON.parse(notice_id).id;
+  const paths = req.files.notice_images.map((file)=>{
+    return file.path;
+  })
+  try {
+	  const notice = await noticeModel.findById(notice_id).select("photos profile_photo photos_replace_count")
+	  await fs.rm(`./files/notice/${notice_id}+${notice.photos_replace_count}`, { recursive: true }, err => {
+	    if (err) {
+	      throw err
+	    }
+	  });
+	  await notice.updateOne({
+	    $set: {photos: paths},
+	    $inc: {photos_replace_count: 1}
+	  })
+	  return res.send(sendJsonWithTokens(req,paths));
+  } catch (error) {
+    return next(error);
+  }
+})
+
+router.get("/get_notice_photos/:number", async (req, res, next)=>{
+  const notice_id =req.body.notice_id;
+  let number = req.params.number;
+  number = Number.parseInt(number);
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(number<1 || number>8) return next(new Error("invalid number"));
+  try {
+	  const notice = await noticeModel.findById(notice_id).select("photos");
+    if(!notice) return next(new Error("notice not found"));
+    if(number+1 > notice.photos.length) return next(new Error("invalid number"));
+    return res.sendFile(process.env.rootPath +notice.photos[number]);
+  } catch (error) {
+	  return next(error);
+  } 
+})
+
+router.get("/get_notice_profile_photo/:notice_id", async (req, res, next)=>{
+  
+  const notice_id =req.params.notice_id;
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  try {
+	  const notice = await noticeModel.findById(notice_id).select("profile_photo");
+    if(!notice) return next(new Error("notice not found"));
+    return res.sendFile(process.env.rootPath +notice.profile_photo);
+  } catch (error) {
+	  return next(error);
+  } 
 })
 
 router.use("/comment", commentsRouter);

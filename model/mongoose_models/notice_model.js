@@ -57,6 +57,7 @@ const noticeShema = new mongoose.Schema({
     photos: {
       type: [{type: String, default: []}],
     },
+    photos_replace_count: {type: Number, default:0},
     profile_photo: {type: String, default: ""},
     state:{type: String, default: noticeStates.awaitConfirmation},
     saler_user:{type: mongoose.SchemaTypes.ObjectId, ref: "user", required: true},

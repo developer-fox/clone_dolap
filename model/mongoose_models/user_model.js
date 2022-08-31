@@ -15,7 +15,8 @@ const userSchema = new mongoose.Schema({
     default: [],
   },
   profile_description: {type:String, default:""},
-  profile_photo: {type: String,  default: "default_photo.png"},
+  profile_photo: {type: String,  default: ""},
+  profile_photo_replace_count: {type: Number, default: 0},
   followers: [{
     type: mongoose.SchemaTypes.ObjectId,
     default: [],
