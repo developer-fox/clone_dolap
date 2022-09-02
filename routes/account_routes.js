@@ -20,7 +20,7 @@ const fs = require("fs");
 
 router.get("/get_profile_info", async (req, res, next)=>{
   try {
-	const user = await user_model.findOne({email: req.decoded.email}).select("profile_photo username phone_number email profile_description");
+	const user = await user_model.findById(req.decoded.id).select("profile_photo username phone_number email profile_description");
 	return res.send(sendJsonWithTokens(req,user));
   } catch (error) {
     return next(error);  
@@ -28,7 +28,7 @@ router.get("/get_profile_info", async (req, res, next)=>{
 })
 
 router.post("/change_profile_photo", fileService.updateUserImage,async (req, res, next)=>{
-  const path =  req.filePath;
+  const path =   `${process.env.URL}/docs/user*${req.filePath.split("/")[2]}`;
   try {
 	  const user = await user_model.findById(req.decoded.id).select("profile_photo profile_photo_replace_count");
 	  if(!user) return next(new Error("user not found"));
@@ -71,20 +71,6 @@ router.delete("/delete_profile_photo",async(req, res, next) =>{
     return next(error);
   }
 
-})
-
-router.get("/get_user_profile_photo/:user_id", async (req, res, next)=>{
-  const user_id = req.params.user_id;
-  if(!user_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(user_id)) return next(new Error("invalid notice id"));
-  try {
-	  const user = await user_model.findById(user_id).select("profile_photo");
-    if(!user) return next(new Error("notice not found"));
-    if(user.profile_photo == "") return res.send(sendJsonWithTokens(req,{profile_photo: ""}));
-    return res.sendFile(process.env.rootPath +user.profile_photo);
-  } catch (error) {
-	  return next(error);
-  } 
 })
 
 router.post("/change_profile_info", async (req, res, next)=>{

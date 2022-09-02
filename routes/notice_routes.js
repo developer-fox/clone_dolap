@@ -95,7 +95,8 @@ router.post("/add_notice", async (req, res, next)=>{
 
 router.post("/create_notice_photos",fileService.uploadNoticeImages,async (req, res, next)=>{
   const paths = req.files.notice_images.map((file)=>{
-    return file.path;
+    let splitted = file.path.split("\\");
+    return `${process.env.URL}/docs/${splitted[1]}*${splitted[2]}*${splitted[3]}`;
   })
 
   try {
@@ -115,8 +116,9 @@ router.post("/update_notice_photos",fileService.updateNoticeImages,async(req, re
   let notice_id = req.body.notice_id;
   notice_id = JSON.parse(notice_id).id;
   const paths = req.files.notice_images.map((file)=>{
-    return file.path;
-  })
+    let splitted = file.path.split("\\");
+    return `${process.env.URL}/docs/${splitted[1]}*${splitted[2]}*${splitted[3]}`; 
+  });
   try {
 	  const notice = await noticeModel.findById(notice_id).select("photos profile_photo photos_replace_count")
 	  await fs.rm(`./files/notice/${notice_id}+${notice.photos_replace_count}`, { recursive: true }, err => {
@@ -132,37 +134,6 @@ router.post("/update_notice_photos",fileService.updateNoticeImages,async(req, re
   } catch (error) {
     return next(error);
   }
-})
-
-router.get("/get_notice_photos/:number", async (req, res, next)=>{
-  const notice_id =req.body.notice_id;
-  let number = req.params.number;
-  number = Number.parseInt(number);
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(number<1 || number>8) return next(new Error("invalid number"));
-  try {
-	  const notice = await noticeModel.findById(notice_id).select("photos");
-    if(!notice) return next(new Error("notice not found"));
-    if(number+1 > notice.photos.length) return next(new Error("invalid number"));
-    return res.sendFile(process.env.rootPath +notice.photos[number]);
-  } catch (error) {
-	  return next(error);
-  } 
-})
-
-router.get("/get_notice_profile_photo/:notice_id", async (req, res, next)=>{
-  
-  const notice_id =req.params.notice_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  try {
-	  const notice = await noticeModel.findById(notice_id).select("profile_photo");
-    if(!notice) return next(new Error("notice not found"));
-    return res.sendFile(process.env.rootPath +notice.profile_photo);
-  } catch (error) {
-	  return next(error);
-  } 
 })
 
 router.use("/comment", commentsRouter);

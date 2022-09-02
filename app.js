@@ -29,7 +29,7 @@ const authenticationRoutes = require("./routes/authentication_routes");
 const accountRoutes = require("./routes/account_routes");
 const noticeRoutes = require("./routes/notice_routes");
 const userRoutes = require("./routes/user_routes");
-const { setTimeout } = require('timers/promises');
+const docsRoutes = require("./routes/docs_routes");
 //middlewares
 const app = express();
 app.use(express.urlencoded({extended:false}));
@@ -44,6 +44,7 @@ app.use((req, res, next) => {
 
 // routers
 app.use("/auth",authenticationRoutes);
+app.use("/docs",docsRoutes)
 app.use("/account", jwtService.validateJwt,accountRoutes);
 app.use("/notice", jwtService.validateJwt, noticeRoutes);
 app.use("/user", jwtService.validateJwt, userRoutes);
