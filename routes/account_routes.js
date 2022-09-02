@@ -17,6 +17,8 @@ const get_similar_notices = require("../controllers/get_similar_notices");
 const fileService = require("../services/file_services");
 const router = express.Router();
 const fs = require("fs");
+const notice_states = require("../model/data_helper_models/notice_states");
+const timeoutService = require("../services/timeout_services");
 
 router.get("/get_profile_info", async (req, res, next)=>{
   try {
@@ -348,7 +350,7 @@ router.get("/get_sizes_spesific/:top_size/:medium_size", async (req, res, next)=
 
 router.get("/get_saling_offers", async (req, res, next)=>{
   try {
-    const datas = await user_model.findById(req.decoded.id).select("notices -_id").populate("notices","_id offers");
+    const datas = await user_model.findById(req.decoded.id).select("notices").populate("notices","_id offers");
 
     let offers = [];
     datas.notices.forEach((item) => {
@@ -386,7 +388,6 @@ router.post("/decline_offer", async (req, res, next)=>{
     const offer = notice.offers.id(offer_id);
     if(!offer) return next(new Error("offer not found"));
     if(offer.offer_state == offer_states.declined) return next(new Error("the offer already declined"));
-
     offer["offer_state"] = offer_states.declined;
     await notice.save();
     const proposer = await user_model.findById(offer.proposer).select("buying_offers");
@@ -450,6 +451,7 @@ router.post("/send_saling_offer", async (req, res) => {
             }
           }
         })
+        timeoutService.deleteOffer(notice_id,req.decoded.id, buyer_id);
         return res.send(sendJsonWithTokens(req, "successfuly"));
       }
     });
@@ -476,11 +478,10 @@ router.post("/accept_offer", async (req, res, next)=>{
     const offer = notice.offers.id(offer_id);
     if(!offer) return next(new Error("offer not found"));
     if(offer.offer_state == offer_states.accepted) return next(new Error("the offer already accepted"));
-
+    if(offer.offer_state == offer_states.expired) return next(new Error("this offer is expired"));
     offer["offer_state"] = offer_states.accepted;
     await notice.save();
     const proposer = await user_model.findById(offer.proposer).select("buying_offers");
-
     const buyerOffer = proposer.buying_offers.map((offer) => {
       if(offer.notice == notice_id){
         return offer;
@@ -635,6 +636,33 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
     return next(error);
   }
 
+})
+
+router.post("/stand_out", async (req, res, next)=>{
+  const notice_id = req.body.notice_id;
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+
+  try {
+	  const notice = await noticeModel.findById(notice_id).select("saler_user is_featured").populate("saler_user","own_use_trending");
+    
+    if(!notice) return next(new Error("notice not found"));
+    if(notice.saler_user != req.decoded.id) return next(new Error("you cannot stand out this notice"));
+    if(notice.is_featured) return next(new Error("this notice is already standed out"));
+    if(notice.saler_user.own_use_trending === 0) return next(new Error("you have not any standing out 	justification "));
+
+    await notice.updateOne({
+      $set: {
+        is_featured: true,
+      },
+      $set: {
+        feature_expire_time: new Date(new Date().setDate(new Date().getDate() +1))
+      }
+    });
+    timeoutService.deleteStandOut(notice_id);
+  } catch (error) {
+    return next(error);
+  }
 })
 
 module.exports = router;

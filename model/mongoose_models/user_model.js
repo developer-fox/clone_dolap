@@ -90,11 +90,13 @@ const userSchema = new mongoose.Schema({
   }],
 
   gotten_buying_offers: {
-    type: [{remaining_time: {type: mongoose.SchemaTypes.Date, required: true},
-    price: {type: Number, required: true},
-    notice: {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "notice"},
-    state: {type:String , default: offerStates.pending},
-    }]
+    type: [{
+      remaining_time: {type: mongoose.SchemaTypes.Date, required: true},
+      price: {type: Number, required: true},
+      notice: {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "notice"},
+      state: {type:String , default: offerStates.pending},
+    }
+    ]
   },
 
   brands: [{type: String, default: []}],
@@ -153,6 +155,7 @@ const userSchema = new mongoose.Schema({
       },
   },
   cart_items_count: {type: Number, default: 0},
+  own_use_trending: {type: Number, default: 0},
 })
 
 module.exports= mongoose.model("user", userSchema, "users");

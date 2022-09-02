@@ -17,12 +17,11 @@ const couponExtents = require('./model/data_helper_models/coupon_extent.js');
 const env = require("dotenv").config();
 const uuid = require('uuid');
 const user_model = require('./model/mongoose_models/user_model');
-const schedule = require("node-schedule");
-
+const timeoutServices= require('./services/timeout_services');
 const multer = require("multer");
 const fs = require("fs");
 const path = require("path");
-
+const ms = require("ms");
 // routes
 const  errorsMiddleware  = require('./controllers/error_handler_controller').errorsMiddleware;
 const authenticationRoutes = require("./routes/authentication_routes");
@@ -40,7 +39,6 @@ app.use((req, res, next) => {
   req.token = req.headers["x-access-token"]; 
   next();
 })
-
 
 // routers
 app.use("/auth",authenticationRoutes);

@@ -21,6 +21,7 @@ const offer_states = require('../model/data_helper_models/offer_states');
 const router = express.Router();
 const fileService = require('../services/file_services');
 const { json } = require('express');
+const timeoutService = require('../services/timeout_services');
 
 router.post("/add_notice", async (req, res, next)=>{
 
@@ -136,6 +137,98 @@ router.post("/update_notice_photos",fileService.updateNoticeImages,async(req, re
   }
 })
 
+//*
+router.post("/price_cut" ,async(req, res, next)=>{
+  const notice_id = req.body.notice_id;
+  let new_price = req.body.new_price;
+  new_price = Number.parseFloat(new_price);
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(Number.isNaN(new_price)) return next(new Error("new price must be a number"));
+  try {
+	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price stars state is_updated");
+    if(!notice) return next(new Error("notice not found"));
+    if(notice.saler_user != req.decoded.id) return next(new Error("you cannot price cutting for this notice: authorization"));
+    if(notice.state != notice_states.takable) return next(new Error("you cannot price cutting for this notice: state"));
+    if(notice.price_details.saling_price >= new_price) return next(new Error("new price must be low than old price"));
+
+    const percent  = ((notice.price_details.saling_price - new_price)/notice.price_details.saling_price)*100;
+    let stars = 0;
+    if(percent < 20 && percent >= 10 ){
+      stars = 2;
+    }
+    else if(percent < 10 && percent >= 5  ){
+      stars = 1;
+    }
+    else if(percent >= 20){
+      stars = 3;
+    }
+    else if(percent < 5 ){
+      stars = 1;
+    }
+    await notice.updateOne({
+      $set: {
+        "price_details.saling_price": new_price
+      },
+      $set: {
+        is_updated: true
+      },
+      $set: {
+        stars: stars
+      }
+    })
+    return res.send(sendJsonWithTokens(req,"successfuly"));
+  } catch (error) {
+	  return next(error);
+  }
+});
+
+router.post("/send_saling_offer_to_favoriteds", async (req, res, next)=>{
+  const notice_id = req.body.notice_id;
+  let offer_price = req.body.offer_price;
+  offer_price  = Number.parseFloat(offer_price);
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(Number.isNaN(offer_price)) return next(new Error("offer price must be a number"));
+  try {
+    const notice = await noticeModel.findById(notice_id).select("favorited_users saler_user price_details.saling_price offers offers_count state");
+    if(!notice) return next(new Error("notice not found"));
+    if(notice.saler_user != req.decoded.id) return next(new Error("you cannot give saling offer for this notice: authorization"));
+    if(notice.state != notice_states.takable) return next(new Error("you cannot give saling offer for this notice: state"));
+    if(notice.price_details <= offer_price) return next(new Error("offer price must be lower than saling price"));
+
+    notice.favorited_users.forEach(async (user) =>{
+      await userModel.findByIdAndUpdate(user, {
+        $addToSet: {
+          gotten_buying_offers: {
+            remaining_time: new Date(new Date().setDate(new Date().getDate() +1)),
+            price: offer_price,
+            notice: notice_id
+          }
+        }
+      }
+      )
+      timeoutService.deleteSalingOffer(notice_id, req.decoded.id, user);
+    })
+    await notice.updateOne({
+      $push: {
+        offers: notice.favorited_users.map(user=>{
+          return {
+            remaining_time: new Date(new Date().setDate(new Date().getDate() +1)),
+            proposer: user,
+            offer_price: offer_price,
+            offer_type: "sale"
+          }
+        })
+      }
+    });
+    return res.send(sendJsonWithTokens(req,"successfuly"));
+    
+  } catch (error) {
+    return next(error);
+  }
+})
+
 router.use("/comment", commentsRouter);
 
 router.post("/add_to_favorites", async (req, res, next)=>{
@@ -210,14 +303,14 @@ router.post("/give_offer",async (req, res, next)=>{
   if(!price || price<1) return next(new Error("price cannot be empty"));
 
   try {
-	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price price_details.selling_with_offer offers");
-
+	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price price_details.selling_with_offer offers state");
+    //if(notice.state != notice_states.takable) return next(new Error("you cant give an offer for this notice"));
     if(!notice._id) return next(new Error("notice not found"));
-    if(!notice.price_details.selling_with_offer) return next(new Error("you cant give offer for this notice")); 
+    //if(!notice.price_details.selling_with_offer) return next(new Error("you cant give offer for this notice")); 
     if(price< (notice.price_details.saling_price)*(7/10)) return next(new Error("very low price for this notice"));
 
     for(let i of notice.offers){
-      if(i.proposer == req.decoded.id){
+      if(i.proposer == req.decoded.id && (i.offer_state == offer_states.accepted || i.offer_state == offer_states.pending)){
         return next(new Error("already you gave an offer"));
       }
     }
@@ -239,7 +332,7 @@ router.post("/give_offer",async (req, res, next)=>{
         notice: notice_id,
       }
     }})
-
+    timeoutService.deleteOffer(notice.id, req.decoded.id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
 
   } catch (error) {

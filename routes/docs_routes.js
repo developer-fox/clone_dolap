@@ -11,7 +11,6 @@ router.get("/:path", async (req, res, next)=>{
 	    return res.sendFile(process.env.rootPath + "files/user/"+path.split("*")[1]);
 	  }
 	  else if(splitted == "notice"){
-      console.log(process.env.rootPath + "files/notice/"+path.split("*")[1]+"/"+path.split("*")[2]);
       return res.sendFile(process.env.rootPath + "files/notice/"+path.split("*")[1]+"/"+path.split("*")[2]);
 	  }
     else{

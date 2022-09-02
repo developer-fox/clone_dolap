@@ -83,6 +83,8 @@ const noticeShema = new mongoose.Schema({
     offers_count: {type: Number, default: 0},
     displayed_count : {type: Number, default: 0},
     is_featured: {type: Boolean, default: false},
+    feature_expire_time: {type: Date, default:new Date(1995, 11, 17, 3, 24, 0)},
+    stars: {type: Number, default: 0}
 });
 
 module.exports = mongoose.model("notice", noticeShema, "notices");
