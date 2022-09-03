@@ -4,7 +4,7 @@ const sendgridTransport = require("nodemailer-sendgrid");
 const mailerPug = require("nodemailer-pug-engine");
 
 const transporter = nodemailer.createTransport(sendgridTransport({
-  apiKey: "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"
+  apiKey: process.env.SENDGRID_KEY
 }));
 
 transporter.use("compile", mailerPug.pugEngine({
