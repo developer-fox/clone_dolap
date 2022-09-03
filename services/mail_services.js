@@ -1,0 +1,223 @@
+
+const nodemailer = require("nodemailer");
+const sendgridTransport = require("nodemailer-sendgrid");
+const mailerPug = require("nodemailer-pug-engine");
+
+const transporter = nodemailer.createTransport(sendgridTransport({
+  apiKey: "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"
+}));
+
+transporter.use("compile", mailerPug.pugEngine({
+  templateDir: __dirname +"/../templates",
+  pretty: true
+}))
+
+module.exports.newCommentMail= (email,username,image_url, brand,saling_price,comment,category,deep_link)=>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "Ürününe Yorum Yapıldı",
+	    template: "new_comment",
+	    ctx: {
+	      username: username,
+	      image_url :image_url,
+	      brand: brand,
+	      saling_price: saling_price,
+	      comment: comment,
+	      category: category,
+	      deep_link: deep_link 
+	    }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.newAnswerMail = (email,username,image_url, brand,category,deep_link)=>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "Ürününe Yorum Yapıldı",
+	    template: "new_answer",
+	    ctx: {
+	      username: username,
+	      image_url :image_url,
+	      brand: brand,
+	      category: category,
+	      deep_link: deep_link 
+	    }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.sendOfferToFavoritesMail = (email,offerer_username, image_url,brand,offer_price, category,deep_link) =>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "YENİ BİR TEKLİFİN VAR!",
+	    template: "send_offer_to_favoriteds",
+	    ctx:{
+        username: offerer_username,
+        image_url :image_url,
+        brand: brand,
+        price: offer_price,
+        category: category,
+        deep_link: deep_link
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.newBuyingOfferMail = (email,offerer_username, image_url,brand,offer_price, category,deep_link) =>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "YENİ BİR TEKLİFİN VAR!",
+	    template: "new_buying_offer",
+	    ctx:{
+        username: offerer_username,
+        image_url :image_url,
+        brand: brand,
+        price: offer_price,
+        category: category,
+        deep_link: deep_link
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.newSalingOffer = (email,offerer_username, image_url,brand,offer_price, category,deep_link) =>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "YENİ BİR SATIŞ TEKLİFİN VAR!",
+	    template: "send_saling_offer",
+	    ctx:{
+        username: offerer_username,
+        image_url :image_url,
+        brand: brand,
+        price: offer_price,
+        category: category,
+        deep_link: deep_link
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.acceptOfferMail = (email,offerer_username, price,image_url,brand, category,deep_link) =>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: `@${offerer_username} TEKLİFİNİ KABUL ETTİ!`,
+	    template: "accept_offer",
+	    ctx:{
+        username: offerer_username,
+        image_url :image_url,
+        price: price,
+        brand: brand,
+        category: category,
+        deep_link: deep_link
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.acceptSaleOfferMail = (email,offerer_username, price,image_url,brand, category,deep_link) =>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "SATIŞ TEKLİFİN KABUL EDİLDİ!",
+	    template: "accept_sale_offer",
+	    ctx:{
+        username: offerer_username,
+        image_url :image_url,
+        price: price,
+        brand: brand,
+        category: category,
+        deep_link: deep_link
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.declineSaleOfferMail = (email,offerer_username,image_url,brand, category,deep_link) =>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "SATIŞ TEKLİFİN REDDEDİLDİ",
+	    template: "decline_sale_offer",
+	    ctx:{
+        username: offerer_username,
+        image_url :image_url,
+        brand: brand,
+        category: category,
+        deep_link: deep_link
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+
+module.exports.declinedOfferMail = (email,offerer_username, image_url,brand, category,deep_link) =>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "TEKLİFİN REDDEDİLDİ.",
+	    template: "decline_offer",
+	    ctx:{
+        username: offerer_username,
+        image_url :image_url,
+        brand: brand,
+        category: category,
+        deep_link: deep_link
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.priceCutEmail = (email, image_url,brand, category, old_price, new_price,size, deep_link)=>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "Beğendiğin ürünün fiyatı düştü!",
+	    template: "price_cut",
+	    ctx:{
+        image_url :image_url,
+        brand: brand,
+        category: category,
+        old_price: old_price,
+        new_price: new_price,
+        size: size,
+        deep_link: deep_link
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}

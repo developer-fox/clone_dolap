@@ -10,7 +10,7 @@ const user_model = require('../model/mongoose_models/user_model');
 const { sendJsonWithTokens } = require('../services/response_sendjson');
 const { isValidObjectId } = require('mongoose');
 const express = require("express");
-
+const mailServices = require("../services/mail_services");
 const router = express.Router();
 
 router.post("/add_comment",  async (req, res, next)=>{
@@ -29,11 +29,10 @@ router.post("/add_comment",  async (req, res, next)=>{
   }
   
   try {
-	  const notice = await noticeModel.findById(notice_id);
+	  const notice = await noticeModel.findById(notice_id).populate("saler_user","email");
     if(!notice._id){
       return next(new Error("notice not found"));
     }
-
     notice.notice_questions.push({
 	    question: {
 	        date: new Date(),
@@ -43,6 +42,11 @@ router.post("/add_comment",  async (req, res, next)=>{
 	    }
 	  );
 	  await notice.save();
+
+    const user = await user_model.findById(req.decoded.id).select("username");
+    console.log(notice.profile_photo);
+    mailServices.newCommentMail(notice.saler_user.email,user.username, notice.profile_photo,notice.details.brand, notice.price_details.saling_price, content, notice.details.category.detail_category,"http://localhost:3200/")
+
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
@@ -62,17 +66,21 @@ router.post("/add_answer",  async (req, res, next)=>{
   if(!content || content.length<1) return next(new Error("content cannot be empty"));
 
   try {
-	  const notice = await noticeModel.findById(notice_id);
+	  const notice = await noticeModel.findById(notice_id).populate();
 	  if(!notice) return next(new Error("notice not found"));
 	  const comment = notice.notice_questions.id(comment_id);
 	  if(!comment) return next(new Error("comment not found"));
-	
 	  comment.answers.push( { 
 	    date: new Date(),
 	    user: req.decoded.id,
 	    content: content,
 	  })
 	  await notice.save();
+    const user = await user_model.findById(req.decoded.id).select("username");
+    const commenter_user = await user_model.findById(comment.question.user).select("email");
+    if(!commenter_user) return next(new Error("user not found"));
+    if(!user) return next(new Error("user not found"));
+    mailServices.newAnswerMail(commenter_user.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/pug");
 	  return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);

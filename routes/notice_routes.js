@@ -22,6 +22,7 @@ const router = express.Router();
 const fileService = require('../services/file_services');
 const { json } = require('express');
 const timeoutService = require('../services/timeout_services');
+const mailServices = require('../services/mail_services');
 
 router.post("/add_notice", async (req, res, next)=>{
 
@@ -74,7 +75,12 @@ router.post("/add_notice", async (req, res, next)=>{
       size_of_cargo: req.body.data.size_of_cargo,
     },
     payer_of_cargo: req.body.data.payer_of_cargo,
-    price_details: req.body.data.price_details,
+    price_details: {
+      buying_price: req.body.data.price_details.buying_price,
+      saling_price: req.body.data.price_details.saling_price,
+      selling_with_offer: req.body.data.price_details.selling_with_offer,
+      initial_price: req.body.data.price_details.saling_price,
+    },
     saler_user: req.decoded.id,
     created_date: new Date(),
   });
@@ -146,13 +152,13 @@ router.post("/price_cut" ,async(req, res, next)=>{
   if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
   if(Number.isNaN(new_price)) return next(new Error("new price must be a number"));
   try {
-	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price stars state is_updated");
+	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price stars state is_updated favorited_users profile_photo details.brand details.size details.category.detail_category price_details.initial_price").populate("favorited_users","email");
     if(!notice) return next(new Error("notice not found"));
     if(notice.saler_user != req.decoded.id) return next(new Error("you cannot price cutting for this notice: authorization"));
     if(notice.state != notice_states.takable) return next(new Error("you cannot price cutting for this notice: state"));
-    if(notice.price_details.saling_price >= new_price) return next(new Error("new price must be low than old price"));
+    if(notice.price_details.saling_price <= new_price) return next(new Error("new price must be low than old price"));
 
-    const percent  = ((notice.price_details.saling_price - new_price)/notice.price_details.saling_price)*100;
+    const percent  = ((notice.price_details.initial_price - new_price)/notice.price_details.initial_price)*100;
     let stars = 0;
     if(percent < 20 && percent >= 10 ){
       stars = 2;
@@ -166,17 +172,19 @@ router.post("/price_cut" ,async(req, res, next)=>{
     else if(percent < 5 ){
       stars = 1;
     }
-    await notice.updateOne({
+
+    let not = await noticeModel.findByIdAndUpdate(notice_id, {
       $set: {
-        "price_details.saling_price": new_price
-      },
-      $set: {
-        is_updated: true
-      },
-      $set: {
+        "price_details.saling_price": new_price,
+        is_updated: true,
         stars: stars
-      }
-    })
+      },
+    }, {new: true}).select("price_details.saling_price");
+
+    for await(let user of notice.favorited_users){
+      mailServices.priceCutEmail(user.email, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, notice.price_details.saling_price, not.price_details.saling_price, notice.details.size, "http://localhost:3200/render");
+    }
+
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
 	  return next(error);
@@ -191,13 +199,14 @@ router.post("/send_saling_offer_to_favoriteds", async (req, res, next)=>{
   if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
   if(Number.isNaN(offer_price)) return next(new Error("offer price must be a number"));
   try {
-    const notice = await noticeModel.findById(notice_id).select("favorited_users saler_user price_details.saling_price offers offers_count state");
+    const notice = await noticeModel.findById(notice_id).select("favorited_users saler_user price_details.saling_price offers offers_count state profile_photo details.brand details.category.detail_category").populate("saler_user","username");
     if(!notice) return next(new Error("notice not found"));
-    if(notice.saler_user != req.decoded.id) return next(new Error("you cannot give saling offer for this notice: authorization"));
+    if(notice.saler_user._id != req.decoded.id) return next(new Error("you cannot give saling offer for this notice: authorization"));
     if(notice.state != notice_states.takable) return next(new Error("you cannot give saling offer for this notice: state"));
     if(notice.price_details <= offer_price) return next(new Error("offer price must be lower than saling price"));
 
     notice.favorited_users.forEach(async (user) =>{
+      const us = await userModel.findById(user).select("email")
       await userModel.findByIdAndUpdate(user, {
         $addToSet: {
           gotten_buying_offers: {
@@ -209,6 +218,7 @@ router.post("/send_saling_offer_to_favoriteds", async (req, res, next)=>{
       }
       )
       timeoutService.deleteSalingOffer(notice_id, req.decoded.id, user);
+      mailServices.sendOfferToFavoritesMail(us.email,notice.saler_user.username, notice.profile_photo, notice.details.brand, offer_price, notice.details.category.detail_category,"http://localhost:3200/render");
     })
     await notice.updateOne({
       $push: {
@@ -223,7 +233,6 @@ router.post("/send_saling_offer_to_favoriteds", async (req, res, next)=>{
       }
     });
     return res.send(sendJsonWithTokens(req,"successfuly"));
-    
   } catch (error) {
     return next(error);
   }
@@ -303,7 +312,7 @@ router.post("/give_offer",async (req, res, next)=>{
   if(!price || price<1) return next(new Error("price cannot be empty"));
 
   try {
-	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price price_details.selling_with_offer offers state");
+	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price price_details.selling_with_offer offers state profile_photo details.brand details.category.detail_category").populate("saler_user","email");
     //if(notice.state != notice_states.takable) return next(new Error("you cant give an offer for this notice"));
     if(!notice._id) return next(new Error("notice not found"));
     //if(!notice.price_details.selling_with_offer) return next(new Error("you cant give offer for this notice")); 
@@ -314,7 +323,7 @@ router.post("/give_offer",async (req, res, next)=>{
         return next(new Error("already you gave an offer"));
       }
     }
-
+    const proposer = await userModel.findById(req.decoded.id).select("username");
     const remaining_time = new Date(new Date().setDate(new Date().getDate() +1));
     const addOfferToNoticeOffers = await noticeModel.findByIdAndUpdate(notice_id, {$addToSet: {offers: {
       proposer: req.decoded.id,
@@ -325,7 +334,7 @@ router.post("/give_offer",async (req, res, next)=>{
       $inc: {offers_count: 1},
     },{new: true})
 
-    const addOfferToProposerUserOfferes = await userModel.findByIdAndUpdate(req.decoded.id, {$addToSet: {
+    await userModel.findByIdAndUpdate(req.decoded.id, {$addToSet: {
       buying_offers: {
         remaining_time: remaining_time,
         price: price,
@@ -333,8 +342,8 @@ router.post("/give_offer",async (req, res, next)=>{
       }
     }})
     timeoutService.deleteOffer(notice.id, req.decoded.id);
+    mailServices.newBuyingOfferMail(notice.saler_user.email, proposer.username, notice.profile_photo, notice.details.brand, price, notice.details.category.detail_category, "http://localhost:3200/render");
     return res.send(sendJsonWithTokens(req,"successfuly"));
-
   } catch (error) {
     return next(error);
   }

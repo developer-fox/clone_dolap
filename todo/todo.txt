@@ -1,13 +1,10 @@
 * email actions
 * credit card actions
-* featureds
 * notice detail_categories js object writing
 * advanced error handling
-* timed actions
 * notifications
 * searching 
 * get related accounts
-* campaigns and coupons
 
 // signup actions
 /sms validation 6 numbers

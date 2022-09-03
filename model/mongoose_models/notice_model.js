@@ -52,6 +52,7 @@ const noticeShema = new mongoose.Schema({
         buying_price: {type: Number, required: true},
         saling_price: {type: Number, required: true},
         selling_with_offer : {type: Boolean, required: true},
+        initial_price: {type: Number, required: true},
       }
     },
     photos: {

@@ -10,7 +10,7 @@ module.exports.deleteOffer = (notice_id, proposer_id) => {
   setTimeout(async() => {
     const notice = await notice_model.findById(notice_id).select("offers");
     notice.offers.forEach( async offer => {
-      if(offer.proposer == proposer_id && offer.offer_state == offer_states.pending && offer.offer_type == "buy"){
+      if(offer.proposer == proposer_id && (offer.offer_state == offer_states.pending || offer.offer_state == offer_states.accepted) && offer.offer_type == "buy"){
         offer.offer_state = offer_states.expired;
         await notice_model.findOneAndUpdate({"_id": notice_id, "offers._id": offer._id}, {$set:{
           "offers.$": offer
@@ -40,6 +40,35 @@ module.exports.deleteSalingOffer = (notice_id, proposer_id,buyer_id) =>{
     const notice = await notice_model.findById(notice_id).select("offers");
     notice.offers.forEach( async offer => {
       if(offer.proposer == proposer_id && offer.offer_state == offer_states.pending && offer.offer_type == "sale"){
+        offer.offer_state = offer_states.expired;
+        await notice_model.findOneAndUpdate({"_id": notice_id, "offers._id": offer._id}, {$set:{
+          "offers.$": offer
+        }});
+
+        const proposer = await user_model.findById(proposer_id).select("gotten_buying_offers");
+        proposer.buying_offers.forEach(async offer=>{
+          if(offer.notice == notice_id){
+            offer.state = offer_states.expired;
+            await user_model.findOneAndUpdate({
+              "_id": buyer_id,
+              "gotten_buying_offers._id": offer._id
+            },{$set: {
+              "gotten_buying_offers.$": offer
+            }}
+            )
+          }
+        })
+      }
+    });
+    console.log("expired");
+  },ms("1d"));
+}
+
+module.exports.deleteSalingAcceptedOffer = (notice_id, proposer_id,buyer_id) =>{
+  setTimeout(async() => {
+    const notice = await notice_model.findById(notice_id).select("offers");
+    notice.offers.forEach( async offer => {
+      if(offer.proposer == proposer_id && offer.offer_state == offer_states.accepted && offer.offer_type == "sale"){
         offer.offer_state = offer_states.expired;
         await notice_model.findOneAndUpdate({"_id": notice_id, "offers._id": offer._id}, {$set:{
           "offers.$": offer

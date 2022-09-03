@@ -1,0 +1,32 @@
+
+doctype html
+
+html
+  head
+    style. 
+      div{
+        width: 100%;
+      }
+      p{
+        font-family: "Helvetica";
+      }
+      a{
+        color:  rgb(71, 184, 152);
+        font-family: "Helvetica";
+      }
+    script(src="https://kit.fontawesome.com/fa4fcc8241.js", crossorigin="anonymous")
+
+  body
+    div(style="background-color: rgb(71, 184, 152);height: 150px;")
+      p(style = "color: white; font-size:32px; font-weight: bold; font-family:Helvetica; padding-top: 80px; padding-left: 80px;")  MyDolap
+    i(class = "fa-solid fa-hand-holding-dollar fa-xl" style = "margin-left: 45%; margin-top:20px;")
+    p(style="text-align: center;") TEKLİFİN REDDEDİLDİ.
+    p(style="text-align: center;") @#{username}, #{category} kategorisindeki #{brand} marka ürüne verdiğin teklifi reddetti.
+    div(style="background-color:rgb(238, 238, 238); height: 300px; ")
+      img(src=image_url width="30%" style="margin-left:35%; margin-top: 3%")
+      p(style="text-align: center; font-weight: bold") #{brand}
+      p(style="text-align: center;") 
+        a(href= deep_link style="text-decoration: none; font-size:12px;") ÜRÜNÜ GÖSTER
+      
+    p(style="text-align: center; font-size:24px; color: rgb(71, 184, 152); margin-top: 20%") MyDolap
+    hr(style="height:2px; color:rgb(238, 238, 238); background-color: rgb(238, 238, 238); border: none")

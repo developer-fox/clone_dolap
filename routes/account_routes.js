@@ -19,6 +19,8 @@ const router = express.Router();
 const fs = require("fs");
 const notice_states = require("../model/data_helper_models/notice_states");
 const timeoutService = require("../services/timeout_services");
+const notice_model = require("../model/mongoose_models/notice_model");
+const mailServices = require("../services/mail_services");
 
 router.get("/get_profile_info", async (req, res, next)=>{
   try {
@@ -184,12 +186,26 @@ router.post("/add_to_favorites", async (req, res, next)=>{
     return next(new Error("invalid notice id(s)"));
   }
 
-  idToBeAdded.forEach((item)=>{
-    if(!mongoose.isValidObjectId(item)){
+  const user = await user_model.findById(req.decoded.id).select("favorites");
+  if(!user) return next(new Error("user not found"));
+  
+  for(id of idToBeAdded) {
+    if(!mongoose.isValidObjectId(id)){
       return next(new Error("invalid notice id(s)"));
     }
-  });
+    if(user.favorites.includes(id)){
+      return next(new Error("this notice is already in your favorites"));
+    } 
+  }
 
+  idToBeAdded.forEach(async(item)=>{
+    await notice_model.findByIdAndUpdate(item, {
+      $addToSet: {
+        favorited_users: req.decoded.id
+      },
+      $inc: {favorites_count: 1}
+    });
+  });
   try {
 	  let process = await user_model.findByIdAndUpdate(req.decoded.id, {$push: {favorites: idToBeAdded}, $inc: {favorites_count: idToBeAdded.length}});
     return res.send(sendJsonWithTokens(req, "notices successfuly added to favorites"));
@@ -381,7 +397,7 @@ router.post("/decline_offer", async (req, res, next)=>{
   if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
 
   try {
-    const notice = await noticeModel.findById(notice_id).select("saler_user offers");
+    const notice = await noticeModel.findById(notice_id).select("saler_user offers profile_photo details.brand details.category.detail_category");
     if(!notice) return next(new Error("notice not found"));
     if(notice.saler_user != req.decoded.id) return next(new Error("bad authorization: you cant this action"));
 
@@ -390,24 +406,26 @@ router.post("/decline_offer", async (req, res, next)=>{
     if(offer.offer_state == offer_states.declined) return next(new Error("the offer already declined"));
     offer["offer_state"] = offer_states.declined;
     await notice.save();
-    const proposer = await user_model.findById(offer.proposer).select("buying_offers");
+    const proposer = await user_model.findById(offer.proposer).select("buying_offers email");
+    const user = await user_model.findById(req.decoded.id).select("username");
 
-    const buyerOffer = proposer.buying_offers.map((offer) => {
-      if(offer.notice == notice_id){
-        return offer;
+    let buyerOffer;
+    proposer.buying_offers.forEach((offer) => {
+      if(offer.notice == notice_id.toString()) {
+        buyerOffer = offer;
       }
-    })[0];
-
+    });
     if(!buyerOffer) return next(new Error("offer not found"));
     buyerOffer["state"] = offer_states.declined;
     await proposer.save();
+    mailServices.declinedOfferMail(proposer.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
   }
 })
 
-router.post("/send_saling_offer", async (req, res) => {
+router.post("/send_saling_offer", async (req, res, next) => {
   const notice_id = req.body.notice_id;
   const offer_id = req.body.offer_id;
   const buyer_id = req.body.buyer_id;
@@ -422,17 +440,29 @@ router.post("/send_saling_offer", async (req, res) => {
   if(!isValidObjectId(buyer_id)) return next(new Error("invalid buyer id"));
 
   try {
-    const notice = await noticeModel.findById(notice_id).select("offers");
+    const notice = await noticeModel.findById(notice_id).select("offers saler_user profile_photo details.brand details.category.detail_category");
     if(!notice) return next(new Error("notice not found"));
-
-	  const buyer = await user_model.findById(buyer).select("buying_offers gotten_buying_offers");
+    if(notice.saler_user != req.decoded.id) return next(new Error("you cant sale offer for this notice"));
+    const saler = await user_model.findById(req.decoded.id).select("username");
+	  const buyer = await user_model.findById(buyer_id).select("buying_offers gotten_buying_offers email");
     if(!buyer) return next(new Error("user not found"));
-	  buyer.buying_offers.forEach(async offer =>{
+
+
+    for(let offer of buyer.gotten_buying_offers){
+      if(offer.notice == notice_id){
+        return next(new Error("already sended an offer"));
+      }
+    }
+
+    for(let offer of buyer.buying_offers){
       if(offer.notice == notice_id){
         if(offer.state != offer_states.declined){
           return next(new Error("you cannot send saling offer"));
         }
-        await buyer.update({
+      }
+    }
+
+        await buyer.updateOne({
           $addToSet: {
             gotten_buying_offers: {
               remaining_time: new Date(new Date().setDate(new Date().getDate() +1)),
@@ -441,10 +471,10 @@ router.post("/send_saling_offer", async (req, res) => {
             }
           }
         });
-        await notice.update({
+        await notice.updateOne({
           $addToSet: {
             offers: {
-              proposer: req.decoded.id,
+              proposer: buyer.id,
               remaining_time: new Date(new Date().setDate(new Date().getDate() +1)),
               offer_price: price,
               offer_type: "sale",
@@ -452,9 +482,8 @@ router.post("/send_saling_offer", async (req, res) => {
           }
         })
         timeoutService.deleteOffer(notice_id,req.decoded.id, buyer_id);
+        mailServices.newSalingOffer(buyer.email, saler.username, notice.profile_photo, notice.details.brand, price, notice.details.category.detail_category, "http://localhost:3200/render");
         return res.send(sendJsonWithTokens(req, "successfuly"));
-      }
-    });
 
   } catch (error) {
     return next(error);
@@ -471,7 +500,7 @@ router.post("/accept_offer", async (req, res, next)=>{
   if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
 
   try {
-    const notice = await noticeModel.findById(notice_id).select("saler_user offers");
+    const notice = await noticeModel.findById(notice_id).select("saler_user offers profile_photo details.brand details.category.detail_category");
     if(!notice) return next(new Error("notice not found"));
     if(notice.saler_user != req.decoded.id) return next(new Error("bad authorization: you cant this action"));
 
@@ -479,18 +508,109 @@ router.post("/accept_offer", async (req, res, next)=>{
     if(!offer) return next(new Error("offer not found"));
     if(offer.offer_state == offer_states.accepted) return next(new Error("the offer already accepted"));
     if(offer.offer_state == offer_states.expired) return next(new Error("this offer is expired"));
+    if(offer.offer_state == offer_states.declined) return next(new Error("this offer is declined"));
     offer["offer_state"] = offer_states.accepted;
     await notice.save();
-    const proposer = await user_model.findById(offer.proposer).select("buying_offers");
-    const buyerOffer = proposer.buying_offers.map((offer) => {
+    const proposer = await user_model.findById(offer.proposer).select("buying_offers email");
+    const saler = await user_model.findById(req.decoded.id).select("username");
+    let buyerOffer; 
+    proposer.buying_offers.map((offer) => {
       if(offer.notice == notice_id){
-        return offer;
+        buyerOffer = offer;
       }
-    })[0];
+    });
 
     if(!buyerOffer) return next(new Error("offer not found"));
     buyerOffer["state"] = offer_states.accepted;
     await proposer.save();
+    timeoutService.deleteOffer(notice_id, proposer.id);
+    mailServices.acceptOfferMail(proposer.email,saler.username,buyerOffer.price, notice.profile_photo, notice.details.brand, notice.details.category.detail_category,"http://localhost:3200/render");
+    return res.send(sendJsonWithTokens(req,"successfuly"));
+  } catch (error) {
+    return next(error);
+  }
+})
+
+router.post("/accept_saling_offer", async(req, res, next) => {
+  const notice_id = req.body.notice_id;
+  const offer_id = req.body.offer_id;
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(!offer_id) return next(new Error("offer id cannot be empty"));
+  if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
+
+  try {
+    const user = await user_model.findById(req.decoded.id).select("gotten_buying_offers username")
+    let offer; 
+
+    for await(let g_offer of user.gotten_buying_offers){
+      console.log(g_offer);
+      if(g_offer._id == offer_id){
+        offer = g_offer; 
+      }
+    }
+
+    if(!offer) return next(new Error("offer not found"));
+    if(offer.state == offer_states.accepted) return next(new Error("the offer already accepted"));
+    if(offer.state == offer_states.expired) return next(new Error("this offer is expired"));
+    if(offer.state == offer_states.declined) return next(new Error("this offer is declined"));
+    offer["state"] = offer_states.accepted;
+    await user.save();
+    const notice = await noticeModel.findById(notice_id).select("saler_user profile_photo details.brand details.category.detail_category offers").populate("saler_user","email");
+
+    notice.offers.forEach( async offer => {
+      if(offer.proposer == offer.proposer && offer.offer_state == offer_states.pending && offer.offer_type == "sale"){
+        offer.offer_state = offer_states.accepted;
+        await notice_model.findOneAndUpdate({"_id": notice_id, "offers._id": offer._id}, {$set:{
+          "offers.$": offer
+        }});
+      }
+    });
+    // 
+    timeoutService.deleteSalingAcceptedOffer(notice.id,notice.saler_user.id, req.decoded.id);
+    mailServices.acceptSaleOfferMail(notice.saler_user.email, user.username, offer.price, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
+    return res.send(sendJsonWithTokens(req,"successfuly"));
+  } catch (error) {
+    return next(error);
+  }
+})
+
+router.post("/decline_saling_offer", async(req, res, next) => {
+  const notice_id = req.body.notice_id;
+  const offer_id = req.body.offer_id;
+  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(!offer_id) return next(new Error("offer id cannot be empty"));
+  if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
+
+  try {
+    const user = await user_model.findById(req.decoded.id).select("gotten_buying_offers username")
+    let offer; 
+
+    for await(let g_offer of user.gotten_buying_offers){
+      console.log(g_offer);
+      if(g_offer._id == offer_id){
+        offer = g_offer; 
+      }
+    }
+
+    if(!offer) return next(new Error("offer not found"));
+    if(offer.state == offer_states.accepted) return next(new Error("the offer is accepted"));
+    if(offer.state == offer_states.expired) return next(new Error("this offer is expired"));
+    if(offer.state == offer_states.declined) return next(new Error("this offer is already declined"));
+    offer["state"] = offer_states.declined;
+    await user.save();
+    const notice = await noticeModel.findById(notice_id).select("saler_user profile_photo details.brand details.category.detail_category offers").populate("saler_user","email");
+
+    notice.offers.forEach( async offer => {
+      if(offer.proposer == offer.proposer && offer.offer_state == offer_states.pending && offer.offer_type == "sale"){
+        offer.offer_state = offer_states.declined;
+        await notice_model.findOneAndUpdate({"_id": notice_id, "offers._id": offer._id}, {$set:{
+          "offers.$": offer
+        }});
+      }
+    });
+    mailServices.declineSaleOfferMail(notice.saler_user.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
