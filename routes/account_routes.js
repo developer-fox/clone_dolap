@@ -662,7 +662,7 @@ router.get("/get_feedbacks", async (req, res, next)=>{
 
 router.get("/get_taken_notices", async (req, res, next)=>{
   try {
-    const result = await user_model.findById(req.decoded.id).select("taken_notices -_id");
+    const result = await user_model.findById(req.decoded.id).select("taken_notices");
     console.log(result);
     return res.send(sendJsonWithTokens(req,result));
   } catch (error) {
@@ -730,7 +730,7 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
           result[randomIndex], result[currentIndex]];
       }
     
-      await userLookedNotices.update({$set: {homepage_notices: result.map(notice=>{
+      await userLookedNotices.updateOne({$set: {homepage_notices: result.map(notice=>{
         return notice._id;
       })}});
 

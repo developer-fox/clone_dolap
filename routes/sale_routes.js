@@ -11,13 +11,15 @@ const sold_notice_states = require("../model/data_helper_models/saled_notice_sta
 const notice_states = require("../model/data_helper_models/notice_states");
 const { sendJsonWithTokens } = require("../services/response_sendjson");
 const notice_model = require("../model/mongoose_models/notice_model");
+const mailServices = require("../services/mail_services");
+const timeoutService = require("../services/timeout_services");
 
 router.post('/check_cart', async(req, res, next)=>{
   const address_id = req.body.address_id;
   if(!address_id) return next(new Error("address id cannot be empty"));
   if(!isValidObjectId(address_id)) return next(new Error("invalid address id"));
   try {
-	  const currentUser = await user_model.findById(req.decoded.id).select("cart addresses user_coupons").populate("cart.items.notice");
+	  const currentUser = await user_model.findById(req.decoded.id).select("cart addresses user_coupons username email").populate("cart.items.notice");
 
     if(!currentUser) return next(new Error("user not found"));
     const address =currentUser.addresses.id(address_id);
@@ -26,6 +28,8 @@ router.post('/check_cart', async(req, res, next)=>{
     const currentTime = new Date();
     for await (let saled_notice of currentUser.cart.items){
       let total_amount = 0;
+      const currentNotice = saled_notice.notice;
+      const currentSaler = await user_model.findById(currentNotice.saler_user).select("username email");
       const payment_details = [
         {
           payment_amount: saled_notice.total_price,
@@ -41,12 +45,13 @@ router.post('/check_cart', async(req, res, next)=>{
         })
       ];
       payment_details.forEach(e=> total_amount += e.payment_amount);
+      const order_code = uuid.v4();
       const soldNotice = new sold_notice_model({
         notice: saled_notice.notice,
         saler_user: saled_notice.notice.saler_user,
         buyer_user: req.decoded.id,
         taken_date: currentTime,
-        order_code: uuid.v4(),
+        order_code: order_code,
         cargo_type: saled_notice.notice.payer_of_cargo,
         states: [{
           state_date: currentTime,
@@ -80,7 +85,12 @@ router.post('/check_cart', async(req, res, next)=>{
         $set: {
           state: notice_states.sold
         }
-      }) 
+      });
+      
+      mailServices.newOrderMail(currentSaler.email,currentNotice.profile_photo,currentSaler.username, currentUser.username,currentNotice.details.brand,total_amount, order_code, currentNotice.payer_of_cargo,`${address.contact_informations.name} ${address.contact_informations.name}`,"http://localhost:3200/render","http://localhost:3200/render");
+
+      mailServices.newTakenNoticeMail(currentUser.email,currentNotice.profile_photo,currentUser.usename,currentNotice.details.brand,total_amount,order_code,currentNotice.payer_of_cargo,`${address.contact_informations.name} ${address.contact_informations.name}`,"http://localhost:3200/render","http://localhost:3200/render");
+      timeoutService.soldNoticeToCargo(soldNotice.id);
     }
     await currentUser.updateOne({
       $set: {

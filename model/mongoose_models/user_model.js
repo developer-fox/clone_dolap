@@ -161,6 +161,10 @@ const userSchema = new mongoose.Schema({
   },
   cart_items_count: {type: Number, default: 0},
   own_use_trending: {type: Number, default: 0},
+  last_search : {
+    type: [mongoose.SchemaTypes.ObjectId],
+    ref: "notice"
+  }
 })
 
 module.exports= mongoose.model("user", userSchema, "users");

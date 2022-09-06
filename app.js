@@ -25,6 +25,7 @@ const ms = require("ms");
 const nodemailer = require("nodemailer");
 const sendgridTransport = require("nodemailer-sendgrid");
 const mailerPug = require("nodemailer-pug-engine");
+const mailServices = require("./services/mail_services");
 
 // routes
 const  errorsMiddleware  = require('./controllers/error_handler_controller').errorsMiddleware;
@@ -34,6 +35,7 @@ const noticeRoutes = require("./routes/notice_routes");
 const userRoutes = require("./routes/user_routes");
 const docsRoutes = require("./routes/docs_routes");
 const saleRoutes = require("./routes/sale_routes");
+const searchRoutes = require("./routes/search_routes");
 //middlewares
 const app = express();
 app.use(express.urlencoded({extended:false}));
@@ -56,6 +58,16 @@ app.use("/account", jwtService.validateJwt,accountRoutes);
 app.use("/notice", jwtService.validateJwt, noticeRoutes);
 app.use("/user", jwtService.validateJwt, userRoutes);
 app.use("/sale", jwtService.validateJwt, saleRoutes);
+app.use("/search", jwtService.validateJwt, searchRoutes);
+
+app.use("/render", async(req,res,next) => {
+try {
+	 mailServices.newSalingOffer(process.env.MAIL2,"asdada","asdasd","adsasd","asdadasd","asdadsa","asadasfadfad");
+} catch (error) {
+	console.log(error);
+}
+})
+
 
 app.use(errorsMiddleware);
 mongoose.connect(process.env.MONGODB_URL).then((connection)=>{

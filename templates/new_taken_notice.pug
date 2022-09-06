@@ -1,0 +1,48 @@
+
+doctype html
+
+html
+  head
+    style. 
+      div{
+        width: 100%;
+      }
+      p{
+        font-family: "Helvetica";
+      }
+      a{
+        color:  rgb(71, 184, 152);
+        font-family: "Helvetica";
+      }
+    script(src="https://kit.fontawesome.com/fa4fcc8241.js", crossorigin="anonymous")
+
+  body
+    p(style = "color: rgb(71, 184, 152); font-size:32px; font-weight: bold; font-family:Helvetica;text-align: center;")  MyDolap
+    p(style = "color: rgb(71, 184, 152); font-size:24px; font-weight: regular; font-family:Helvetica;text-align: center;")  SİPARİŞİN ONAYLANDI!
+    div(style= "height: 60px;display: flex;")
+      div(style="background-color:rgb(71, 184, 152); width:40px; height:40px; border-radius: 50%; margin-left:80px;")
+        i(class="fa-solid fa-check fa-xl" style="color:white; padding-top:20px; padding-left:8px;")
+      hr(style="height:1.6px; color:black;margin-top:20px; background-color:black; border: none; width: 60px")
+      div(style="background-color: white; width:40px; height:40px; border-radius: 50%; border: 1px solid black")
+      hr(style="height:1.6px; color:black;margin-top:20px; background-color:black; border: none; width: 60px")
+      div(style="background-color: white; width:40px; height:40px; border-radius: 50%; margin-right:80px; border: 1px solid black")
+
+
+    p(style="text-align: center;") Merhaba @#{buyername}, siparişin onaylandı ve en geç 4 iş günü içerisinde kargoya verilecek.
+    div(style="background-color:rgb(238, 238, 238); height: 200px; ")
+      img(src=image_url width="30%" style="margin-left:35%; margin-top: 3%")
+      p(style="text-align: center; font-weight: bold") #{brand}
+      p(style="text-align: center;") 
+        a(href= deep_link style="text-decoration: none; font-size:12px;") ÜRÜNE GİT
+      
+    p(style="text-align: center;font-weight: bold; line-height:4px") Sipariş Tutarı:
+    p(style="text-align: center;") #{amount} TL
+    p(style="text-align: center;font-weight: bold; line-height:4px") Sipariş No:
+    p(style="text-align: center;") #{order_code}
+    p(style="text-align: center;font-weight: bold; line-height:4px") Kargo:
+    p(style="text-align: center;") #{payer_of_cargo}
+    p(style="text-align: center;font-weight: bold; line-height:4px") Alıcı:
+    p(style="text-align: center;") #{contact_name}
+    p(style="text-align: center;") 
+      a(href= order_deeplink style="text-decoration: none; font-size:8px;") SİPARİŞE GİT
+    hr(style="height:2px; color:rgb(238, 238, 238); background-color: rgb(238, 238, 238); border: none")

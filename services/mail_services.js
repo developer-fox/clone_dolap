@@ -221,3 +221,52 @@ module.exports.priceCutEmail = (email, image_url,brand, category, old_price, new
 	  throw error;
   }
 }
+
+module.exports.newOrderMail = (email, image_url,salername,buyername,brand, amount,order_code,payer_of_cargo,contact_name,notice_deeplink, order_deeplink)=>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "Yeni Siparişin Var!",
+	    template: "new_order",
+	    ctx:{
+        salername: salername,
+        buyername: buyername,
+        amount: amount,
+        brand: brand,
+        order_code: order_code,
+        payer_of_cargo: payer_of_cargo,
+        contact_name: contact_name,
+        notice_deeplink: notice_deeplink,
+        order_deeplink: order_deeplink,
+        image_url: image_url,
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}
+
+module.exports.newTakenNoticeMail = (email, image_url,buyername,brand, amount,order_code,payer_of_cargo,contact_name,notice_deeplink, order_deeplink)=>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "Siparişin Onaylandı!",
+	    template: "new_taken_notice",
+	    ctx:{
+        buyername: buyername,
+        amount: amount,
+        order_code: order_code,
+        brand: brand,
+        payer_of_cargo: payer_of_cargo,
+        contact_name: contact_name,
+        notice_deeplink: notice_deeplink,
+        order_deeplink: order_deeplink,
+        image_url: image_url,
+      }
+	  });
+  } catch (error) {
+	  throw error;
+  }
+}

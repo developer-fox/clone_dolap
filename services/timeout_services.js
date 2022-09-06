@@ -5,6 +5,8 @@ const notice_model = require("../model/mongoose_models/notice_model");
 const offer_states = require("../model/data_helper_models/offer_states");
 const user_model = require("../model/mongoose_models/user_model");
 const notice_states = require("../model/data_helper_models/notice_states");
+const sold_notice_model = require("../model/mongoose_models/sold_notice_model");
+const saled_notice_states = require("../model/data_helper_models/saled_notice_states");
 
 module.exports.deleteOffer = (notice_id, proposer_id) => {
   setTimeout(async() => {
@@ -105,4 +107,48 @@ module.exports.deleteStandOut = (notice_id)=>{
 	  throw error;
     }
   },ms("1d"));
+}
+
+module.exports.soldNoticeToCargo = (sold_notice_id)=>{
+  const randomHour = Math.floor(Math.random() * 48) +1;
+  setTimeout(async()=>{
+    try {
+
+      const sold_notice = await sold_notice_model.findById(sold_notice_id).select("states");
+      if(sold_notice.states[sold_notice.states.length-1].state_type == saled_notice_states.approved){
+        await sold_notice_model.findByIdAndUpdate(sold_notice_id, {
+          $addToSet: {
+            states: {
+              state_date: new Date(),
+              state_type: saled_notice_states.shipped
+            }
+          }
+        })  
+        this.soldNoticeToDelivered(sold_notice_id);
+      }
+    } catch (error) {
+      throw error;
+    }  
+  },
+  ms(`${randomHour}h`));
+}
+
+module.exports.soldNoticeToDelivered = (sold_notice_id)=>{
+  const randomHour = Math.floor(Math.random() * 48) +1;
+  setTimeout(async()=>{
+    try {
+	    await sold_notice_model.findByIdAndUpdate(sold_notice_id, {
+	      $addToSet: {
+	        states: {
+	          state_date: new Date(),
+	          state_type: saled_notice_states.delivered
+	        }
+	      }
+	    })
+	
+    } catch (error) {
+      throw error;
+    }  
+  },
+  ms(`${randomHour}h`));
 }
