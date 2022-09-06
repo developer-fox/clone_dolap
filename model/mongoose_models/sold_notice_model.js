@@ -10,10 +10,8 @@ const _schema = new mongoose.Schema({
   cargo_type: {type: String, required: true},
   order_code : {type: String, required: true},
   states: [{
-    state_title: {type: String, required: true},
     state_date: {type: Date, required: true},
     state_type: {type: String, required: true},
-    state_details: {type: String, required: false},
   }],
   contact_informations: {
     name: {type: String, required: true},

@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 const offerStates = require('../data_helper_models/offer_states');
 const addressSchema = require("./address_model");
 const sizes_model = require('./sizes_model');
-const soldNoticeModel = require("./taken_notice_model");
+const soldNoticeModel = require("./sold_notice_model");
 
 const userSchema = new mongoose.Schema({
   // credit card informations will be added later"
@@ -146,13 +146,18 @@ const userSchema = new mongoose.Schema({
       items: [{
         notice: {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "notice"},
         total_price: {type: Number, required: true},
-        },],
+        },
+        ],
         details: [{
         detail_id: {type: mongoose.SchemaTypes.ObjectId},
         description: {type: String},
         amount: {type: Number},
         }]
       },
+      default: {
+        items: [],
+        details: [],
+      }
   },
   cart_items_count: {type: Number, default: 0},
   own_use_trending: {type: Number, default: 0},

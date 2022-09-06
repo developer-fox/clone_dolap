@@ -1,5 +1,4 @@
 * email actions
-* credit card actions
 * notice detail_categories js object writing
 * advanced error handling
 * notifications
@@ -11,5 +10,3 @@
 /email validation with link
 
 * application get starting
-* decline offer and send sale offer
-* an offers is usable in 24 hours

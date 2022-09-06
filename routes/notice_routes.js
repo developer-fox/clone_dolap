@@ -375,12 +375,13 @@ router.post("/add_to_cart", async (req, res, next)=>{
   if(Number.isNaN(Number.parseFloat(price))) return next(new Error("price cannot be empty"));
 
   try {
-	const notice = await noticeModel.findById(notice_id).select("price_details.saling_price  size_of_cargo payer_of_cargo").populate("saler_user","_id");
+	const notice = await noticeModel.findById(notice_id).select("price_details.saling_price state size_of_cargo payer_of_cargo").populate("saler_user","_id");
   if(!notice) return next(new Error("notice not found"));
 	
-  const currentUser = await userModel.findById(req.decoded.id).select("gotten_buying_offers");
+  const currentUser = await userModel.findById(req.decoded.id).select("gotten_buying_offers cart");
   if(!currentUser) return next(new Error("user not found"));
 
+  if(notice.state != notice_states.takable) return next(new Error("you cant add this notice to your cart"));
   if(price < notice.price_details.saling_price){
     if(currentUser.gotten_buying_offers.length ==0){
       return next(new Error("sent buying price from saler not found"));
@@ -393,7 +394,15 @@ router.post("/add_to_cart", async (req, res, next)=>{
           }
           else{
             if(price == offer.price){
-              await currentUser.update({
+
+              console.log(currentUser);
+              for await(let item of currentUser.cart.items){
+                if(item.notice == notice_id){
+                  return next(new Error("you already added to cart this notice"));
+                }
+              }
+
+              await currentUser.updateOne({
                 $addToSet: {
                   //! distressing
                   "cart.items":{
@@ -418,18 +427,43 @@ router.post("/add_to_cart", async (req, res, next)=>{
 
   }
   else if(price == notice.price_details.saling_price){
-    await currentUser.update({
+        for await(let item of currentUser.cart.items){
+      if(item.notice == notice_id){
+        return next(new Error("you already added to cart this notice"));
+      }
+    }
+
+    await currentUser.updateOne({
       $addToSet: {
         //! distressing
         "cart.items":{
           notice: notice_id,
           total_price : price
-        }, 
+        },
       },
       $inc: {
         cart_items_count: 1
       }
     });
+
+    if(notice.payer_of_cargo == cargo_payers.buyer){
+      let cargo_amount = 0;
+      for await(let key of Object.keys(cargo_sizes)){
+        if(cargo_sizes[key].title == notice.details.size_of_cargo){
+          cargo_amount = cargo_sizes[key].price;
+          break;
+        }
+      }
+      await currentUser.updateOne({
+        $addToSet: {
+          "cart.details": {
+            description: "Kargo ücreti",
+            amount: cargo_amount
+          } 
+        }
+      })
+    }
+
     return res.send(sendJsonWithTokens(req,"successfuly"));
   }
   else{
@@ -442,10 +476,10 @@ router.post("/add_to_cart", async (req, res, next)=>{
 
 router.get("/get_cart", async (req, res, next)=>{
   try {
-	  const user = await userModel.findOne(req.decoded.id).select("cart cart_items_count").populate("cart.items.notice","profile_photo title details.use_case details.size").populate("cart.items.notice.saler_user", "profile_photo saler_score username");
+	  const user = await userModel.findById(req.decoded.id).select("cart cart_items_count").populate("cart.items.notice","profile_photo title details.use_case details.size").populate("cart.items.notice.saler_user", "profile_photo saler_score username");
 	  
 	  if(!user) return next(new Error("user not found"));
-	  const total_amount = 0;
+	  let total_amount = 0;
 	  user.cart.items.forEach(element=>{
 	    total_amount += element.total_price;
 	  })
@@ -474,7 +508,7 @@ router.post("/use_coupon_code", async (req, res, next)=>{
 	
 	  user.user_coupons.forEach(async element =>{
 	    if(element.coupon.code == code && !(element.is_used_before) && element.coupon.state == couponStates.usable){
-        await user.update({
+        await user.updateOne({
           $addToSet: {
             "cart.details": {
               description: element.coupon.title,
@@ -494,27 +528,29 @@ router.post("/use_coupon_code", async (req, res, next)=>{
 })
 
 router.delete("/pop_to_cart", async(req, res, next)=>{
-  const notice_id = req.body.notice_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  const element_id = req.body.element_id;
+  if(!element_id) return next(new Error("notice id cannot be empty"));
+  if(!isValidObjectId(element_id)) return next(new Error("invalid element id"));
   try {
 	  const user = await userModel.findById(req.decoded.id).select("cart");
 	  if(!user) return next(new Error("user not found"));
-    user.cart.items.forEach(async item=>{
-      if(item.notice == notice_id){
-        await user.update({
-          $pull: {
+    console.log(user.cart.items);
+    for await(let item of user.cart.items){
+      if(item._id == element_id){
+
+        await user.updateOne({
+           $pull: {
             "cart.items": {
-              "cart.items.notice" : notice_id
+              _id: element_id
             }
-          },
+           },
           $inc: {
             cart_items_count: -1
           },
         });
         return res.send(sendJsonWithTokens(req,"successfuly"));
       }
-    });
+    };
     return next(new Error("notice is not found in your cart"));
   } catch (error) {
 	  return next(error);

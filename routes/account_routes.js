@@ -11,7 +11,7 @@ const user_model = require("../model/mongoose_models/user_model");
 const noticeModel = require("../model/mongoose_models/notice_model");
 const validator = require("validator").default;
 const { sendJsonWithTokens } = require("../services/response_sendjson");
-const soldNoticeModel = require("../model/mongoose_models/taken_notice_model");
+const soldNoticeModel = require("../model/mongoose_models/sold_notice_model");
 const offer_states = require("../model/data_helper_models/offer_states");
 const get_similar_notices = require("../controllers/get_similar_notices");
 const fileService = require("../services/file_services");
@@ -152,8 +152,8 @@ router.post("/add_address", async (req, res, next)=>{
     address_informations : req.body.address_informations ?? "undefined ??",
   }
   try {
-	  const result = await user_model.updateOne({email: req.decoded.email}, {$addToSet: {addresses: new_address}});
-    return res.send(sendJsonWithTokens(req, result));
+	  const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {addresses: new_address}});
+    return res.send(sendJsonWithTokens(req, "successfuly"));
   } catch (error) {
 	return next(error);
   }
