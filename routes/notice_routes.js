@@ -299,7 +299,7 @@ router.get("/notice_details",async (req, res, next)=>{
   if(!notice_id) return next(new Error("notice id cannot be empty"));
   if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
 
-  const notice = await noticeModel.findById(notice_id).select("-price_details.buying_price -offers ").populate("saler_user","profile_photo username is_validated saler_score last_seen").populate("favorited_users", "profile_photo username");
+  const notice = await noticeModel.findById(notice_id).select("-price_details.buying_price -offers").populate("saler_user","profile_photo username is_validated saler_score last_seen").populate("favorited_users", "profile_photo username");
   return res.send(sendJsonWithTokens(req, notice));
 
 })
@@ -313,9 +313,9 @@ router.post("/give_offer",async (req, res, next)=>{
 
   try {
 	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price price_details.selling_with_offer offers state profile_photo details.brand details.category.detail_category").populate("saler_user","email");
-    //if(notice.state != notice_states.takable) return next(new Error("you cant give an offer for this notice"));
+    if(notice.state != notice_states.takable) return next(new Error("you cant give an offer for this notice"));
     if(!notice._id) return next(new Error("notice not found"));
-    //if(!notice.price_details.selling_with_offer) return next(new Error("you cant give offer for this notice")); 
+    if(!notice.price_details.selling_with_offer) return next(new Error("you cant give offer for this notice")); 
     if(price< (notice.price_details.saling_price)*(7/10)) return next(new Error("very low price for this notice"));
 
     for(let i of notice.offers){

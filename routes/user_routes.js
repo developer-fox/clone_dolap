@@ -12,6 +12,8 @@ const notice_get_filters = require('../model/data_helper_models/notice_get_filte
 const notice_get_sorting_parameters = require('../model/data_helper_models/notice_get_sorting_parameters');
 const cargo_payers = require('../model/data_helper_models/cargo_payers');
 const router = express.Router();
+const filteringService = require("../services/filtering_service");
+const sortingService = require("../services/sorting_service");
 
 router.get("/get_user_info", async (req, res, next) =>{
   const user_id = req.body.user_id;
@@ -58,122 +60,12 @@ router.get("/get_user_notices/:page", async (req, res, next)=>{
     });
 
     let result = notices.notices;
-    let filteredNotics = [];
     if(filters){
-      Object.keys(filters).forEach(key=>{
-      if(!(["max_price","min_price","payer_of_cargo"].includes(key))){
-
-        filters[key].forEach(value=>{
-          result.forEach(notice => {
-            if(key == "top_category"){
-              if(notice.details.category.top_category === value){
-                filteredNotics.push(notice);
-              }
-            }
-            else if(key == "medium_category"){
-              if(notice.details.category.medium_category === value){
-                filteredNotics.push(notice);
-              }
-            }
-            else if(key == "bottom_category"){
-              if(notice.details.category.bottom_category === value){
-                filteredNotics.push(notice);
-              }
-            }
-            else if(key == "detail_category"){
-              if(notice.details.category.detail_category === value){
-                filteredNotics.push(notice);
-              }
-            }
-            else if(key == "brand"){
-              if(notice.details.brand === value){
-                filteredNotics.push(notice);
-              }
-            }
-            else if(key == "size"){
-              if(notice.details.size === value){
-                filteredNotics.push(notice);
-              }
-            }
-            else if(key == "color"){
-              if(notice.details.color === value){
-                filteredNotics.push(notice);
-              }
-            }
-            else if(key == "use_case"){
-              if(notice.details.use_case === value){
-                filteredNotics.push(notice);
-              }
-            }
-          });
-        });
-      }
-      else{
-        result.forEach(notice => {
-          if(key == "max_price"){
-            if(notice.price_details.saling_price  <= filters[key]){
-              filteredNotics.push(notice);
-            }
-          }
-          else if(key == "min_price"){
-            if(notice.price_details.saling_price  >= filters[key]){
-              filteredNotics.push(notice);
-            }
-          }
-          else if(key == "payer_of_cargo"){
-            if(notice.payer_of_cargo === filters[key]){
-              filteredNotics.push(notice);
-            }
-          }
-          else{
-            console.log("eszz");
-          }
-  
-        })
-      }
-      result = filteredNotics;
-      filteredNotics = [];
-    }
-      )
+      result = filteringService(notices.notices,filters);
     }
 
     if(sorting){
-      if(sorting === notice_get_sorting_parameters.maximumPrice){
-        result.sort(function(a,b){
-          return  (b.price_details.saling_price) - (a.price_details.saling_price); 
-        })
-      }
-      else if(sorting === notice_get_sorting_parameters.minimumPrice){
-        result.sort(function(a,b){
-          return  (a.price_details.saling_price) - (b.price_details.saling_price); 
-        })
-      }
-      else if(sorting === notice_get_sorting_parameters.mostDisplayed){
-        result.sort(function(a,b){
-          return  (b.displayed_count) - (a.displayed_count); 
-        })
-      }
-      else if(sorting === notice_get_sorting_parameters.mostFavorite){
-        result.sort(function(a,b){
-          return  (b.favorites_count) - (a.favorites_count); 
-        })
-      }
-      else if(sorting === notice_get_sorting_parameters.mostOffer){
-        result.sort(function(a,b){
-          return  (b.offers_count) - (a.offers_count); 
-        })
-      }
-      else if(sorting === notice_get_sorting_parameters.newest){
-        result.sort(function(a,b){
-          return  Date.parse(b.created_date) - (a.created_date); 
-        })
-      }
-      else if(sorting === notice_get_sorting_parameters.related){
-        result = result;
-      }
-      else{
-        return next(new Error("an error detected when sorting notices"));
-      }
+      result = sortingService(result,sorting)
     }
 
 

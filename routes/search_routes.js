@@ -1,9 +1,13 @@
 
 const express = require("express");
+const notice_get_filters = require("../model/data_helper_models/notice_get_filters");
+const notice_get_sorting_parameters = require("../model/data_helper_models/notice_get_sorting_parameters");
 const notice_states = require("../model/data_helper_models/notice_states");
 const notice_model = require("../model/mongoose_models/notice_model");
 const user_model = require("../model/mongoose_models/user_model");
+const filtering_service = require("../services/filtering_service");
 const { sendJsonWithTokens } = require("../services/response_sendjson");
+const sorting_service = require("../services/sorting_service");
 
 const  router= express.Router();
 
@@ -78,16 +82,49 @@ router.post("/:search_string", async (req, res, next)=>{
 
 router.get("/get_last_search/:page", async (req, res, next)=>{
   const page = req.params.page;
+  const filters = req.body.filters;
+  const sorting = req.body.sorting;
+
   if(Number.isNaN(Number.parseInt(page))) return next(new Error("page must be a number"));
+  try {
+    if(!filters && !sorting){
+      const lastSearchedItems = await user_model.findById(req.decoded.id).select("last_search").populate({
+        path: "last_search",
+        select: "profile_photo details.brand details.size price_details.saling_price favorites_count is_featured created_date payer_of_cargo",
+        skip: (page-1)*15,
+        limit: 15
+      });
+      return res.send(sendJsonWithTokens(req,lastSearchedItems));
+    }
+    else{
+      if(filters){
+        Object.keys(filters).forEach(key=>{
+          if(!notice_get_filters.includes(key)){
+            return next(new Error("undefined filter parameter"));
+          }
+        })
+      }    
+      if(sorting && !Object.values(notice_get_sorting_parameters).includes(sorting)){
+        return next(new Error("undefined sorting parameter"));
+      }
+    
+      let result;
+      const notices = await user_model.findById(req.decoded.id).select("last_search").populate({
+        path: "last_search",
+        select: "profile_photo details.brand details.size price_details.saling_price favorites_count is_featured created_date payer_of_cargo",
+      });
+      if(filters){
+        result = filtering_service(notices,filters);
+      }
+      if(sorting){
+        result = sorting_service(notices,sorting);
+      }
+      return res.send(sendJsonWithTokens(req,result.slice((page-1)*15, (page*15)),));
 
-  const lastSearchedItems = await user_model.findById(req.decoded.id).select("last_search").populate({
-    path: "last_search",
-    select: "profile_photo details.brand details.size price_details.saling_price favorites_count is_featured",
-    skip: (page-1)*2,
-    limit: 2
-  })
-  return res.send(sendJsonWithTokens(req,lastSearchedItems));
-
+    }
+  } catch (error) {
+    return next(error);
+  } 
 })
 
 module.exports= router;
