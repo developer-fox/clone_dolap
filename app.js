@@ -62,12 +62,20 @@ app.use("/search", jwtService.validateJwt, searchRoutes);
 
 app.use("/render", async(req,res,next) => {
 try {
-	 mailServices.newSalingOffer(process.env.MAIL2,"asdada","asdasd","adsasd","asdadasd","asdadsa","asadasfadfad");
+	 mailServices.blankMail();
 } catch (error) {
 	console.log(error);
 }
 })
 
+
+app.use("/",(req,res,next) => {
+  res.send("in home");
+});
+
+app.use("/favicon.ico", (req,res,next)=>{
+  res.send("a favicon");
+});
 
 app.use(errorsMiddleware);
 mongoose.connect(process.env.MONGODB_URL).then((connection)=>{

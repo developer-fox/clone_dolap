@@ -4,7 +4,7 @@ const sendgridTransport = require("nodemailer-sendgrid");
 const mailerPug = require("nodemailer-pug-engine");
 
 const transporter = nodemailer.createTransport(sendgridTransport({
-  apiKey: process.env.SENDGRID_KEY
+  apiKey: process.env.SENDGRID_KEY,
 }));
 
 transporter.use("compile", mailerPug.pugEngine({
@@ -73,6 +73,15 @@ module.exports.sendOfferToFavoritesMail = (email,offerer_username, image_url,bra
   } catch (error) {
 	  throw error;
   }
+}
+
+module.exports.blankMail = ()=>{
+  transporter.sendMail({
+    to: process.env.MAIL2,
+    from : process.env.MAIL,
+    subject: "blank",
+    text: "an example"
+  });
 }
 
 module.exports.newBuyingOfferMail = (email,offerer_username, image_url,brand,offer_price, category,deep_link) =>{

@@ -1,8 +1,6 @@
-* email actions
 * notice detail_categories js object writing
 * advanced error handling
 * notifications
-* searching 
 * get related accounts
 
 // signup actions
