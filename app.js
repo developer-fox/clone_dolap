@@ -26,6 +26,7 @@ const nodemailer = require("nodemailer");
 const sendgridTransport = require("nodemailer-sendgrid");
 const mailerPug = require("nodemailer-pug-engine");
 const mailServices = require("./services/mail_services");
+const socketServices = require("./services/socket_services");
 
 // routes
 const  errorsMiddleware  = require('./controllers/error_handler_controller').errorsMiddleware;
@@ -60,26 +61,14 @@ app.use("/user", jwtService.validateJwt, userRoutes);
 app.use("/sale", jwtService.validateJwt, saleRoutes);
 app.use("/search", jwtService.validateJwt, searchRoutes);
 
-app.use("/render", async(req,res,next) => {
-try {
-	 mailServices.blankMail();
-} catch (error) {
-	console.log(error);
-}
-})
-
-
-app.use("/",(req,res,next) => {
-  res.send("in home");
-});
-
-app.use("/favicon.ico", (req,res,next)=>{
-  res.send("a favicon");
-});
 
 app.use(errorsMiddleware);
-mongoose.connect(process.env.MONGODB_URL).then((connection)=>{
-  app.listen(process.env.PORT);
+
+mongoose.connect(process.env.MONGODB_URL).then(async (connection)=>{
+  const server = app.listen(process.env.PORT);
+  socketServices.initializeIo(server);
+
+  const io = socketServices.getIo();
 })
 .catch((err)=>{
   console.log(err);
