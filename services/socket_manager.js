@@ -28,7 +28,7 @@ module.exports.initializeIo = (server)=>{
   }
   else{
     io = socketio(server);
-    
+
     // jwt validating
     io.use(async (socket,next)=>{
       let auth = socket.handshake.auth;
@@ -97,9 +97,12 @@ module.exports.initializeIo = (server)=>{
       socket.on("notification_seen",socketService.setNotificationSeenInfo),
       socket.on("activate_user", socketService.activateUser),
       socket.on("deactivate_user",socketService.deactivateUser),
+      socket.on("listen_user_activate", socketService.listenUserActivation),
+      socket.on("abort_listen_user_activate", socketService.abortListeningUserActivation),
       // emits
       socketService.emitExample,
-      socketService.emitNotificationOneUser
+      socketService.emitNotificationOneUser,
+      socketService.emitActivationInfoToAnotherUsers
     }
 
     io.on("connection",onConnection);

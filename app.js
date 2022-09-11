@@ -31,7 +31,7 @@ const app = express();
 const socketManager = require("./services/socket_manager");
 const server = http.createServer(app);
 socketManager.initializeIo(server);
-const socket_servives = require("./services/socket_services")(socketManager.getIo());
+const socket_services = require("./services/socket_services")(socketManager.getIo());
 
 // routes
 const  errorsMiddleware  = require('./controllers/error_handler_controller').errorsMiddleware;
@@ -67,18 +67,12 @@ app.use("/user", jwtService.validateJwt, userRoutes);
 app.use("/sale", jwtService.validateJwt, saleRoutes);
 app.use("/search", jwtService.validateJwt, searchRoutes);
 
-app.use("/send/:socket_id",(req,res,next)=>{
-  const model = new notificationModel("exam!","this is an exam","notices");
-
-  socket_servives.emitNotificationOneUser(model,"H4YIcAOtWvN7cn8-AAAB");
-  return res.send("successfuly");
-})
-
 app.use(errorsMiddleware);
 
-mongoose.connect(process.env.MONGODB_URL).then(async (connection)=>{
-  server.listen(process.env.PORT);
 
+mongoose.connect(process.env.MONGODB_URL)
+.then(async (connection)=>{
+  server.listen(process.env.PORT);
 })
 .catch((err)=>{
   console.log(err);

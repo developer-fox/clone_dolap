@@ -10,5 +10,6 @@ router.post("/signup",validators.isEmail, validators.isPasswordPowerless,validat
 router.post("/login_with_username", validators.isUsernameValid, controllers.loginController);
 router.post("/login_with_email", validators.isEmail, controllers.loginController);
 router.post("/change_password", jwtService.validateJwt, validators.isNewPasswordPowerless, controllers.newPasswordController);
+
 // delete account route add later
 module.exports = router;

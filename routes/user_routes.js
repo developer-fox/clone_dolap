@@ -82,7 +82,6 @@ router.get("/get_user_notices/:page", async (req, res, next)=>{
   }
 })
 
-//TODO: condition will added later
 router.post("/add_rating", async(req, res, next) => {
   const sold_notice_id = req.body.sold_notice_id;
   const user_id = req.body.user_id;
@@ -220,7 +219,7 @@ router.post("/follow_user", async (req, res, next)=>{
       new Date(),
       currentUserFollowsList.id,
     );
-    
+
     socketServices.emitNotificationOneUser(notification, user_id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {

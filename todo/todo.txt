@@ -1,10 +1,8 @@
 * notice detail_categories js object writing
 * advanced error handling
-* notifications
 * get related accounts
 
 // signup actions
-/sms validation 6 numbers
 /email validation with link
 
 * application get starting
