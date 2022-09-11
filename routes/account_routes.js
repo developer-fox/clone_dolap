@@ -21,6 +21,13 @@ const notice_states = require("../model/data_helper_models/notice_states");
 const timeoutService = require("../services/timeout_services");
 const notice_model = require("../model/mongoose_models/notice_model");
 const mailServices = require("../services/mail_services");
+const socketManager = require("../services/socket_manager")
+const socketServices = require("../services/socket_services")(socketManager.getIo());
+const socket_model = require("../model/mongoose_models/socket_model");
+const notification_schema = require("../model/mongoose_models/notification_schema");
+const notificationModel = require("../model/data_helper_models/notification_model");
+const notification_types = require("../model/data_helper_models/notification_types");
+
 
 router.get("/get_profile_info", async (req, res, next)=>{
   try {
@@ -419,6 +426,15 @@ router.post("/decline_offer", async (req, res, next)=>{
     buyerOffer["state"] = offer_states.declined;
     await proposer.save();
     mailServices.declinedOfferMail(proposer.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
+    const notification = new notificationModel(
+      "Teklifin reddedildi",
+      `@${user.username} ${notice.details.category.detail_category} kategorisindeki ${notice.details.brand} marka ürüne verdiğin ${buyerOffer.price} TL'lik teklifi reddetti`,
+      notification_types.offer,
+      new Date(),
+      notice.id
+    );
+    socketServices.emitNotificationOneUser(notification,proposer.id);
+
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
@@ -483,6 +499,15 @@ router.post("/send_saling_offer", async (req, res, next) => {
         })
         timeoutService.deleteOffer(notice_id,req.decoded.id, buyer_id);
         mailServices.newSalingOffer(buyer.email, saler.username, notice.profile_photo, notice.details.brand, price, notice.details.category.detail_category, "http://localhost:3200/render");
+
+        const notification = new notificationModel(
+          `Yeni bir satış teklifin var!`,
+          `@${saler.username}, ${notice.detail.brand} marka ürünü için sana özel ${price} TL'lik teklif verdi.`,
+          notification_types.offer,
+          new Date(),
+          notice.id,
+        )
+        socketServices.emitNotificationOneUser(notification,buyer.id);
         return res.send(sendJsonWithTokens(req, "successfuly"));
 
   } catch (error) {
@@ -525,6 +550,16 @@ router.post("/accept_offer", async (req, res, next)=>{
     await proposer.save();
     timeoutService.deleteOffer(notice_id, proposer.id);
     mailServices.acceptOfferMail(proposer.email,saler.username,buyerOffer.price, notice.profile_photo, notice.details.brand, notice.details.category.detail_category,"http://localhost:3200/render");
+
+    const notification = new notificationModel(
+      "Teklifin kabul edildi!",
+      `@${saler.username}, ${notice.details.brand} marka ${notice.details.category.detail_category} ürünü için yaptığın teklifi kabul etti.`,
+      notification_types.offer,
+      new Date(),
+      notice_id
+    );
+
+    socketServices.emitNotificationOneUser(notification,proposer.id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
@@ -569,6 +604,15 @@ router.post("/accept_saling_offer", async(req, res, next) => {
     // 
     timeoutService.deleteSalingAcceptedOffer(notice.id,notice.saler_user.id, req.decoded.id);
     mailServices.acceptSaleOfferMail(notice.saler_user.email, user.username, offer.price, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
+
+    const notification = new notificationModel(
+      "Satış teklifin kabul edildi!",
+      `@${user.username} ${ details.brand} marka ${details.category.detail_category} ürünün için verdiğin ${offer.price} TL'lik teklifi kabul etti.`,
+      notification_types.offer,
+      new Date(),
+      notice.id,
+    )
+    socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
@@ -611,6 +655,16 @@ router.post("/decline_saling_offer", async(req, res, next) => {
       }
     });
     mailServices.declineSaleOfferMail(notice.saler_user.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
+    
+
+    const notification = new notificationModel(
+      "Satış teklifin kabul reddedildi",
+      `@${user.username} ${ details.brand} marka ${details.category.detail_category} ürünün için verdiğin ${offer.price} TL'lik teklifi reddetti.`,
+      notification_types.offer,
+      new Date(),
+      notice.id,
+    )
+    socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);

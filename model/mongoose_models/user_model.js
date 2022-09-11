@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const offerStates = require('../data_helper_models/offer_states');
 const addressSchema = require("./address_model");
+const notification_schema = require('./notification_schema');
 const sizes_model = require('./sizes_model');
 const soldNoticeModel = require("./sold_notice_model");
 
@@ -114,16 +115,11 @@ const userSchema = new mongoose.Schema({
     ref: "feedback",
     default: []
   },
-  notifications: [{
-    type: {
-      notification_category: {type: String, required: true},
-      Notification_content: {type: String, required: true},
-      notification_date: {type: Date, required: true},
-      is_seen: {type: Boolean, default: false},
-      notification_relating_id: {type: mongoose.SchemaTypes.ObjectId, required: true},
-    },
+  notifications: {
+    type: [notification_schema],
     default: [],
-  }],
+  },
+  unseen_notifications_count: {type: Number, default: 0},
   taken_notices: {
     type: [mongoose.SchemaTypes.ObjectId],
     ref: "sold_notice",

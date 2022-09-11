@@ -68,8 +68,8 @@ module.exports.loginController = async (req, res, next) => {
     return next(new Error("undefined login type"));
   }
     const password = req.body.password;
-    const passwordCompare = await bcrypt.compare(password, userInDb.password);
-    //const passwordCompare = password === userInDb.password;
+    //const passwordCompare = await bcrypt.compare(password, userInDb.password);
+    const passwordCompare = password === userInDb.password;
     if(!passwordCompare){
       return next(new Error("email veya kullanıcı adı hatalı"));
     }
