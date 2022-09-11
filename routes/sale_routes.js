@@ -13,6 +13,10 @@ const { sendJsonWithTokens } = require("../services/response_sendjson");
 const notice_model = require("../model/mongoose_models/notice_model");
 const mailServices = require("../services/mail_services");
 const timeoutService = require("../services/timeout_services");
+const socketManager = require("../services/socket_manager");
+const socketServices = require("../services/socket_services")(socketManager.getIo());
+const notification_types = require("../model/data_helper_models/notification_types");
+const notificationModel = require("../model/data_helper_models/notification_model");
 
 router.post('/check_cart', async(req, res, next)=>{
   const address_id = req.body.address_id;
@@ -29,7 +33,7 @@ router.post('/check_cart', async(req, res, next)=>{
     for await (let saled_notice of currentUser.cart.items){
       let total_amount = 0;
       const currentNotice = saled_notice.notice;
-      const currentSaler = await user_model.findById(currentNotice.saler_user).select("username email");
+      const currentSaler = await user_model.findById(currentNotice.saler_user).select("username email sold_notices_count");
       const payment_details = [
         {
           payment_amount: saled_notice.total_price,
@@ -91,6 +95,34 @@ router.post('/check_cart', async(req, res, next)=>{
 
       mailServices.newTakenNoticeMail(currentUser.email,currentNotice.profile_photo,currentUser.usename,currentNotice.details.brand,total_amount,order_code,currentNotice.payer_of_cargo,`${address.contact_informations.name} ${address.contact_informations.name}`,"http://localhost:3200/render","http://localhost:3200/render");
       timeoutService.soldNoticeToCargo(soldNotice.id);
+
+      if(currentSaler.sold_notices_count == 0){
+        const firstSaleNotification= new notificationModel(
+          "Tebrikler, ilk siparişini aldın!",
+          "Tebrikler, ilk siparişini aldın! Nasıl kargolayacağını öğrenmek için tıkla.",
+          notification_types.order,
+          new Date(),
+          "", 
+          );
+        socketServices.emitNotificationOneUser(firstSaleNotification, currentSaler.id);
+      }
+      const salerNotification = new notificationModel(
+        "Tebrikler, Yeni bir siparişin var!", 
+        "Tebrikler, Yeni bir siparişin var! Sipariş detayları için tıkla.",
+        notification_types.order,
+        new Date(),
+        soldNotice.id, 
+      );
+      socketServices.emitNotificationOneUser(salerNotification, currentSaler.id);
+      
+      const buyerNotification = new notificationModel(
+        "Siparişin onaylandı!",
+        `${currentNotice.details.brand} marka ${currentNotice.details.category.detail_category} ürün siparişin onaylandı. Detayları görmek için tıkla.`,
+        notification_types.order,
+        new Date(),
+        soldNotice.id, 
+      );
+      socketServices.emitNotificationOneUser(buyerNotification, req.decoded.id);
     }
     await currentUser.updateOne({
       $set: {
@@ -101,6 +133,7 @@ router.post('/check_cart', async(req, res, next)=>{
         cart_items_count: 0
       },
     });
+
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     console.log(error);
@@ -114,7 +147,7 @@ router.post("/cancel_buying", async (req, res, next)=>{
   if(!isValidObjectId(sold_notice_id)) return next(new Error("invalid sold notice id"));
 
   try {
-    const sold_notice = await sold_notice_model.findById(sold_notice_id);
+    const sold_notice = await sold_notice_model.findById(sold_notice_id).populate("notice","details.category.detail_category details.brand").populate("buyer_user","username");
     if(!sold_notice) return next(new Error("sold notice not found"));
     if(sold_notice.buyer_user != req.decoded.id) return next(new Error("you cant cancel this saling"));
     if(sold_notice.states[[sold_notice.states.length-1]].state_type != sold_notice_states.approved) return next(new Error("you cant cancel this saling"));
@@ -149,6 +182,14 @@ router.post("/cancel_buying", async (req, res, next)=>{
       }
     });
 
+    const salerNotification = new notificationModel(
+      "Alıcı siparişi iptal etti.",
+      `@${sold_notice.buyer_user.username} ${sold_notice.notice.details.brand} ${sold_notice.notice.details.category.detail_category} siparişini iptal etti.`,
+      notification_types.order,
+      new Date(),
+      sold_notice.id
+    );
+    socketServices.emitNotificationOneUser(salerNotification,sold_notice.saler_user);
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
@@ -162,7 +203,7 @@ router.post("/cancel_saling", async (req, res, next)=>{
   if(!isValidObjectId(sold_notice_id)) return next(new Error("invalid sold notice id"));
 
   try {
-    const sold_notice = await sold_notice_model.findById(sold_notice_id);
+    const sold_notice = await sold_notice_model.findById(sold_notice_id).populate("saler_user","username").populate("notice","details.category.detail_category details.brand");
     if(!sold_notice) return next(new Error("sold notice not found"));
     if(sold_notice.saler_user != req.decoded.id) return next(new Error("you cant cancel this saling"));
     if(sold_notice.states[[sold_notice.states.length-1]].state_type != sold_notice_states.approved) return next(new Error("you cant cancel this saling"));
@@ -196,7 +237,15 @@ router.post("/cancel_saling", async (req, res, next)=>{
         sold_notices_count: -1
       }
     });
-
+    
+    const buyerNotification = new notificationModel(
+      "Satıcı siparişi iptal etti.",
+      `@${sold_notice.saler_user.username} ${sold_notice.notice.details.brand} ${sold_notice.notice.details.category.detail_category} siparişini iptal etti.`,
+      notification_types.order,
+      new Date(),
+      sold_notice.id
+    );
+    socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user);
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
@@ -204,13 +253,31 @@ router.post("/cancel_saling", async (req, res, next)=>{
 
 })
 
-router.get("/get_order_info", async (req, res, next)=>{
+router.get("/get_order_info_buyer", async (req, res, next)=>{
   const sold_notice_id = req.body.sold_notice_id;
   if(!sold_notice_id) return next(new Error("sold notice id cannot be empty"));
   if(!isValidObjectId(sold_notice_id)) return next(new Error("invalid sold notice id"));
 
   try {
     const order = await sold_notice_model.findById(sold_notice_id).populate("notice", "details.category.detail_category details.use_case details.size profile_photo price_details.initial_price").populate("saler_user","username");
+
+    if(!order) return next(new Error("order not found"));
+    return res.send(sendJsonWithTokens(req,order));
+
+  } catch (error) {
+    console.log(error);
+    return next(error);
+  }
+
+})
+
+router.get("/get_order_info_saler", async (req, res, next)=>{
+  const sold_notice_id = req.body.sold_notice_id;
+  if(!sold_notice_id) return next(new Error("sold notice id cannot be empty"));
+  if(!isValidObjectId(sold_notice_id)) return next(new Error("invalid sold notice id"));
+
+  try {
+    const order = await sold_notice_model.findById(sold_notice_id).populate("notice", "details.category.detail_category details.use_case details.size profile_photo price_details.initial_price").populate("buyer_user","username");
 
     if(!order) return next(new Error("order not found"));
     return res.send(sendJsonWithTokens(req,order));

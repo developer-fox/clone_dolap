@@ -4,4 +4,5 @@ module.exports = {
   offer: "offer",
   order: "order",
   campaign: "campaign",
+  anotherUsers: "anotherUsers",
 }

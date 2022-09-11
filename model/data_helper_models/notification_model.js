@@ -1,4 +1,6 @@
 
+
+const notification_types = require('./notification_types');
 class notificationModel{
   constructor(title,subtitle,type,date,item_id){
     this.title = title;
@@ -14,7 +16,7 @@ class notificationModel{
       Notification_title: this.title,
       Notification_subtitle: this.subtitle,
       notification_date: this.date,
-      notification_relating_id: this.item_id,
+      notification_relating_id: this.type == notification_types.comment ? this.item_id[0] :this.item_id, 
     };
   }
 

@@ -23,6 +23,11 @@ const fileService = require('../services/file_services');
 const { json } = require('express');
 const timeoutService = require('../services/timeout_services');
 const mailServices = require('../services/mail_services');
+const socketManager = require("../services/socket_manager");
+const socketServices = require("../services/socket_services")(socketManager.getIo());
+const notification_types = require("../model/data_helper_models/notification_types");
+const notificationModel = require("../model/data_helper_models/notification_model");
+
 
 router.post("/add_notice", async (req, res, next)=>{
 
@@ -183,6 +188,14 @@ router.post("/price_cut" ,async(req, res, next)=>{
 
     for await(let user of notice.favorited_users){
       mailServices.priceCutEmail(user.email, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, notice.price_details.saling_price, not.price_details.saling_price, notice.details.size, "http://localhost:3200/render");
+      const notification = new notificationModel(
+        `Beğendiğin ürünün fiyatı düştü!`,
+        `${notice.details.brand} marka ${notice.details.category.detail_category} ürününün fiyatı ${notice.price_details.saling_price} TL'den ${not.price_details.saling_price} TL'ye düştü.`,
+        notification_types.offer,
+        new Date(),
+        notice.id,
+      );
+      socketServices.emitNotificationOneUser(notification, user.id);
     }
 
     return res.send(sendJsonWithTokens(req,"successfuly"));
@@ -205,7 +218,7 @@ router.post("/send_saling_offer_to_favoriteds", async (req, res, next)=>{
     if(notice.state != notice_states.takable) return next(new Error("you cannot give saling offer for this notice: state"));
     if(notice.price_details <= offer_price) return next(new Error("offer price must be lower than saling price"));
 
-    notice.favorited_users.forEach(async (user) =>{
+    for await(let user of notice.favorited_users){
       const us = await userModel.findById(user).select("email")
       await userModel.findByIdAndUpdate(user, {
         $addToSet: {
@@ -216,10 +229,20 @@ router.post("/send_saling_offer_to_favoriteds", async (req, res, next)=>{
           }
         }
       }
-      )
+      );
       timeoutService.deleteSalingOffer(notice_id, req.decoded.id, user);
       mailServices.sendOfferToFavoritesMail(us.email,notice.saler_user.username, notice.profile_photo, notice.details.brand, offer_price, notice.details.category.detail_category,"http://localhost:3200/render");
-    })
+
+      const notification = new notificationModel(
+        `@${notice.saler_user._id} ürününü beğenenlere özel bir teklif yaptı!`,
+        `@${notice.saler_user._id}, ${details.brand} marka ${details.category.detail_category} ürünü için beğenenlere özel teklif verdi. Acele et! Teklifi kabul etmek için yalnızca 24 saatin var.`,
+        notification_types.offer,
+        new Date(),
+        notice.id
+      );
+      socketServices.emitNotificationOneUser(notification, user);
+    }
+
     await notice.updateOne({
       $push: {
         offers: notice.favorited_users.map(user=>{
@@ -236,7 +259,7 @@ router.post("/send_saling_offer_to_favoriteds", async (req, res, next)=>{
   } catch (error) {
     return next(error);
   }
-})
+});
 
 router.use("/comment", commentsRouter);
 
@@ -247,15 +270,23 @@ router.post("/add_to_favorites", async (req, res, next)=>{
   if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
 
   try {
-    const user = await userModel.findById(req.decoded.id).select("favorites");
+    const user = await userModel.findById(req.decoded.id).select("favorites username");
     if(user.favorites.includes(notice_id)){
       return next(new Error("the notice is already in favorites"));
     }
     const result =  await userModel.findByIdAndUpdate(req.decoded.id, {$addToSet: {favorites:notice_id}}, {new: true});
-    
+    const notice = await noticeModel.findById(notice_id).select("saler_user");
     await noticeModel.findByIdAndUpdate(notice_id, {$inc: {favorites_count: 1}, $addToSet: {favorited_users: req.decoded.id}});
 
     if(result.favorites.includes(notice_id)) {
+      const notification = new notificationModel(
+        `@${user.username} ürününü beğendi!`,
+        `Dilersen ona özel bir satış teklifi gönderebilirsin.`,
+        notification_types.anotherUsers,
+        new Date(),
+        [user.id, notice_id],
+      );
+      socketServices.emitNotificationOneUser(notification, notice.saler_user.id);
       return res.send(sendJsonWithTokens(req,"successfuly"));
     }
     else {
@@ -343,6 +374,15 @@ router.post("/give_offer",async (req, res, next)=>{
     }})
     timeoutService.deleteOffer(notice.id, req.decoded.id);
     mailServices.newBuyingOfferMail(notice.saler_user.email, proposer.username, notice.profile_photo, notice.details.brand, price, notice.details.category.detail_category, "http://localhost:3200/render");
+
+    const notification = new notificationModel(
+      "Yeni bir teklifin var!",
+      `@${proposer.username} ${details.brand} marka ${details.category.detail_category} ürünün için ${price} TL'lik bir teklif verdi.`,
+      notification_types.offer,
+      new Date(),
+      notice_id
+    );
+    socketServices.emitNotificationOneUser(notification, notice.saler_user.id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);

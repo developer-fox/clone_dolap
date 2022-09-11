@@ -14,6 +14,10 @@ const cargo_payers = require('../model/data_helper_models/cargo_payers');
 const router = express.Router();
 const filteringService = require("../services/filtering_service");
 const sortingService = require("../services/sorting_service");
+const socketManager = require("../services/socket_manager");
+const socketServices = require("../services/socket_services")(socketManager.getIo());
+const notification_types = require("../model/data_helper_models/notification_types");
+const notificationModel = require("../model/data_helper_models/notification_model");
 
 router.get("/get_user_info", async (req, res, next) =>{
   const user_id = req.body.user_id;
@@ -103,6 +107,7 @@ router.post("/add_rating", async(req, res, next) => {
 
 
   try {
+    const rater_user = await userModel.findById(req.decoded.id).select("username");
     let total_rating = (communication_rate + validity_rate + packing_rate)/3;
     const notice = await soldNoticesModel.findById(sold_notice_id).select("notice saler_user buyer_user payment_total.amount").populate("notice","profile_photo title");
     if(!notice) return next(new Error("notice not found"));
@@ -124,7 +129,14 @@ router.post("/add_rating", async(req, res, next) => {
       }
     }}, $inc:{ratings_count: 1} },);
     const processMessage = result.acknowledged ? "successfuly": "rating sending failed";
-
+    const notification = new notificationModel(
+      "Profilin hakkında değerlendirme yapıldı.",
+      `@${rater_user.id} değerlendirme yaptı: ${content}`,
+      notification_types.comment,
+      new Date(),
+      [req.decoded.id,notice.id]
+    );
+    socketServices.emitNotificationOneUser(notification, user_id);
     return res.send(sendJsonWithTokens(req,processMessage));
 
   } catch (error) {
@@ -140,16 +152,22 @@ router.post("/answer_the_rating", async (req, res, next) =>{
   if(!mongoose.isValidObjectId(rating_id)) return next(new Error("invalid rating id"));
   if(!content || content.length<1) return next(new Error("content cannot be empty/null"));
   try {
-	
-	  const ratings = await userModel.findById(req.decoded.id).select("ratings");
-
+	  const ratings = await userModel.findById(req.decoded.id).select("ratings username");
+    const currentUser = ratings;
 	  const rating = ratings.ratings.id(rating_id);
     if(!rating) return next(new Error("rating not found"));
     if(rating.saler_answer) return next(new Error("you cant add a new answer"));
 
     rating.saler_answer = content;
     await ratings.save();
-
+    const notification = new notificationModel(
+      "Değerlendirmene cevap verildi.",
+      `@${currentUser.username} değerlendirmene yanıt verdi: ${content}`,
+      notification_types.comment,
+      new Date(),
+      [currentUser.id, rating.rating_notice]
+    );
+    socketServices.emitNotificationOneUser(notification, rating.rater_user);
     return res.send(sendJsonWithTokens(req,"successfuly"));
 	
   } catch (error) {
@@ -168,7 +186,7 @@ router.get("/get_user_ratings/:page", async (req, res, next)=>{
 
   if(page <= 0) return next(new Error("invalid page number"));
 
-  const ratings = await userModel.findById(user_id).select("ratings -_id").populate("ratings.rating_notice","profile_photo title price_details.saling_price");
+  const ratings = await userModel.findById(user_id).select("ratings _id").populate("ratings.rating_notice","profile_photo title price_details.saling_price");
 
   const result = ratings.ratings.map(rating => {
     delete rating._doc.rater_user;
@@ -190,14 +208,21 @@ router.post("/follow_user", async (req, res, next)=>{
   if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
   try {
 	
-	  const currentUserFollowsList = await userModel.findById(req.decoded.id).select("follows follows_count");
+	  const currentUserFollowsList = await userModel.findById(req.decoded.id).select("follows follows_count username");
 	  if(!currentUserFollowsList) return next(new Error("an error detected"));
     if(currentUserFollowsList.follows.includes(user_id)) return next(new Error("you already following this user "));
-  
     await currentUserFollowsList.updateOne({$addToSet: {follows: user_id}, $inc: {follows_count: 1}});
-
+    
+    const notification = new notificationModel(
+      "Yeni bir takipçin var!",
+      `@${currentUserFollowsList.username} seni takip etmeye başladı.`,
+      notification_types.anotherUsers,
+      new Date(),
+      currentUserFollowsList.id,
+    );
+    
+    socketServices.emitNotificationOneUser(notification, user_id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
-
   } catch (error) {
     return next(error);
   }

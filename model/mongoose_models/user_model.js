@@ -43,7 +43,6 @@ const userSchema = new mongoose.Schema({
   }],
   is_credible_saler :{type: Boolean, default: false},
   saler_score: {type: Number, required: false},
-  last_seen: {type: Date},
   ratings: {
     type: [
       {
@@ -160,7 +159,9 @@ const userSchema = new mongoose.Schema({
   last_search : {
     type: [mongoose.SchemaTypes.ObjectId],
     ref: "notice"
-  }
+  },
+  last_seen: {type: Date},
+  is_active: {type: Boolean, default: false},
 })
 
 module.exports= mongoose.model("user", userSchema, "users");

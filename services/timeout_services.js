@@ -114,7 +114,8 @@ module.exports.soldNoticeToCargo = (sold_notice_id)=>{
   setTimeout(async()=>{
     try {
 
-      const sold_notice = await sold_notice_model.findById(sold_notice_id).select("states");
+      const sold_notice = await sold_notice_model.findById(sold_notice_id).populate("notice", "details.brand details.category.detail_category");
+      const currentNotice = sold_notice.notice;
       if(sold_notice.states[sold_notice.states.length-1].state_type == saled_notice_states.approved){
         await sold_notice_model.findByIdAndUpdate(sold_notice_id, {
           $addToSet: {
@@ -124,6 +125,16 @@ module.exports.soldNoticeToCargo = (sold_notice_id)=>{
             }
           }
         })  
+
+        const buyerNotification = new notificationModel(
+          "Siparişin Kargoya verildi.",
+          `${currentNotice.details.brand} marka ${currentNotice.details.category.detail_category} ürün satıcı tarafından kargoya verildi. Detayları görmek için tıkla.`,
+          notification_types.order,
+          new Date(),
+          currentNotice.id, 
+        );
+        socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user);
+
         this.soldNoticeToDelivered(sold_notice_id);
       }
     } catch (error) {
@@ -144,8 +155,19 @@ module.exports.soldNoticeToDelivered = (sold_notice_id)=>{
 	          state_type: saled_notice_states.delivered
 	        }
 	      }
-	    })
+	    });
+
+      const sold_notice = await sold_notice_model.findById(sold_notice_id).populate("notice", "details.brand details.category.detail_category");
+      const currentNotice = sold_notice.notice;
 	
+      const buyerNotification = new notificationModel(
+        "Siparişin teslim edildi.",
+        `${currentNotice.details.brand} marka ${currentNotice.details.category.detail_category} ürünün ${sold_notice.contact_informations.name} ${sold_notice.contact_informations.surname} tarafından teslim alındı. İyi günlerde kullanın!`,
+        notification_types.order,
+        new Date(),
+        currentNotice.id, 
+      );
+      socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user.id);
     } catch (error) {
       throw error;
     }  

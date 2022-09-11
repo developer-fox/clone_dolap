@@ -12,6 +12,10 @@ const { isValidObjectId } = require('mongoose');
 const express = require("express");
 const mailServices = require("../services/mail_services");
 const router = express.Router();
+const socketManager = require("../services/socket_manager");
+const socketServices = require("../services/socket_services")(socketManager.getIo());
+const notification_types = require("../model/data_helper_models/notification_types");
+const notificationModel = require("../model/data_helper_models/notification_model");
 
 router.post("/add_comment",  async (req, res, next)=>{
 
@@ -29,7 +33,7 @@ router.post("/add_comment",  async (req, res, next)=>{
   }
   
   try {
-	  const notice = await noticeModel.findById(notice_id).populate("saler_user","email");
+	  const notice = await noticeModel.findById(notice_id).select("details price_details notice_questions").populate("saler_user","email");
     if(!notice._id){
       return next(new Error("notice not found"));
     }
@@ -44,8 +48,16 @@ router.post("/add_comment",  async (req, res, next)=>{
 	  await notice.save();
 
     const user = await user_model.findById(req.decoded.id).select("username");
-    console.log(notice.profile_photo);
-    mailServices.newCommentMail(notice.saler_user.email,user.username, notice.profile_photo,notice.details.brand, notice.price_details.saling_price, content, notice.details.category.detail_category,"http://localhost:3200/")
+    mailServices.newCommentMail(notice.saler_user.email,user.username, notice.profile_photo,notice.details.brand, notice.price_details.saling_price, content, notice.details.category.detail_category,"http://localhost:3200/");
+    
+    const notification = new notificationModel(
+      `${notice.details.brand} marka ${notice.details.category.detail_category} ürününe yorum yapıldı!`,
+      `@${user.username} yorum yaptı: ${content}`,
+      notification_types.comment,
+      new Date(),
+      [user.id, notice.id],
+    );
+    socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
 
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
@@ -81,6 +93,15 @@ router.post("/add_answer",  async (req, res, next)=>{
     if(!commenter_user) return next(new Error("user not found"));
     if(!user) return next(new Error("user not found"));
     mailServices.newAnswerMail(commenter_user.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/pug");
+
+    const notification = new notificationModel(
+      `@${user.username} soruna yorumuna cevap verdi!`,
+      `"${content}"`,
+      notification_types.comment,
+      new Date(),
+      [user.id, notice.id],
+    );
+    socketServices.emitNotificationOneUser(notification,commenter_user.id);
 	  return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);
