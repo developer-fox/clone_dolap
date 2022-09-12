@@ -1,0 +1,27 @@
+
+doctype html
+
+html
+  head
+    style. 
+      div{
+        width: 100%;
+      }
+      p{
+        font-family: "Helvetica";
+      }
+      a{
+        color:  rgb(71, 184, 152);
+        font-family: "Helvetica";
+      }
+    script(src="https://kit.fontawesome.com/fa4fcc8241.js", crossorigin="anonymous")
+
+  body
+    div(style="background-color: white ;height: 180px;")
+      p(style = "color: rgb(71, 184, 152); font-size:32px; font-weight: reqular; font-family:Helvetica; padding-top: 80px; padding-left: 36%;")  MyDolap
+      p(style = "color: rgb(71, 184, 152); font-size:20px; font-weight: reqular; font-family:Helvetica; padding-left: 20%; line-height: 20px;")  E-POSTA ADRESİ DOĞRULAMA
+    i(class = "fa-solid fa-envelope-circle-check fa-xl" style = "color: rgba(71, 184, 152,0.7);margin-left: 45%; margin-top:20px;")
+    p(style="text-align: center; font-size: 18px") Merhaba @#{username}, E-posta adresini doğrulamak için aşağıdaki butona tıkla.
+    form(action = deep_link)
+      button(type="submit", style="color: white;background-color: rgb(71, 184, 152); text-align: center; padding: 15px 25px;font-size:15px; border:none;margin-left: 38%") Doğrula
+    hr(style="height:2px; color:rgb(238, 238, 238); background-color: rgb(238, 238, 238); border: none; margin-top: 100px")

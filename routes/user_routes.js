@@ -2,15 +2,12 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const userModel = require('../model/mongoose_models/user_model');
-const noticeModel = require('../model/mongoose_models/notice_model');
 const { sendJsonWithTokens } = require('../services/response_sendjson');
 const user_report_reasons = require('../model/data_helper_models/user_report_reasons');
-const notice_get_files = require('../model/data_helper_models/notice_get_filters');
 const user_report_model = require('../model/mongoose_models/user_report_model');
 const soldNoticesModel = require('../model/mongoose_models/sold_notice_model');
 const notice_get_filters = require('../model/data_helper_models/notice_get_filters');
 const notice_get_sorting_parameters = require('../model/data_helper_models/notice_get_sorting_parameters');
-const cargo_payers = require('../model/data_helper_models/cargo_payers');
 const router = express.Router();
 const filteringService = require("../services/filtering_service");
 const sortingService = require("../services/sorting_service");
@@ -104,44 +101,46 @@ router.post("/add_rating", async(req, res, next) => {
   if(validity_rate<0 ||validity_rate> 5) return next(new Error("invalid rate value"));
   if(packing_rate<0 ||packing_rate> 5) return next(new Error("invalid rate value"));
 
-
   try {
     const rater_user = await userModel.findById(req.decoded.id).select("username");
     let total_rating = (communication_rate + validity_rate + packing_rate)/3;
     const notice = await soldNoticesModel.findById(sold_notice_id).select("notice saler_user buyer_user payment_total.amount").populate("notice","profile_photo title");
     if(!notice) return next(new Error("notice not found"));
-    const user = await userModel.findById(user_id).select("username profile_photo");
+    const user = await userModel.findById(user_id).select("username profile_photo saler_score ratings");
     if(!user) return next(new Error("user not found"));
     if(notice.saler_user != user._id) return next(new Error("wrong saler information"));
     if(notice.buyer_user != req.decoded.id) return next(new Error("wrong buyer user"));
 
-    const result = await user.updateOne({$addToSet: {ratings: {
-      rater_user: req.decoded.id,
-      rating_notice: notice,
-      rate_date: new Date(),
-      rating_content: content,
-      total_rating: total_rating,
-      rating_details: {
+    const result = await user.updateOne({
+      $addToSet: {ratings: {
+        rater_user: req.decoded.id,
+        rating_notice: notice,
+        rate_date: new Date(),
+        rating_content: content,
+        total_rating: total_rating,
+        rating_details: {
         communication_rate: communication_rate,
         validity_rate: validity_rate,
         packing_rate: packing_rate
-      }
-    }}, $inc:{ratings_count: 1} },);
+        }
+      }}, 
+      $inc:{ratings_count: 1},
+      $set: {saler_score: (((user.saler_score)*(user.ratings_count)) + total_rating)/(user.ratings_count +1)}
+    },);
     const processMessage = result.acknowledged ? "successfuly": "rating sending failed";
     const notification = new notificationModel(
       "Profilin hakkında değerlendirme yapıldı.",
-      `@${rater_user.id} değerlendirme yaptı: ${content}`,
-      notification_types.comment,
+      `@${rater_user.username} değerlendirme yaptı: ${content}`,
+      notification_types.rating,
       new Date(),
-      [req.decoded.id,notice.id]
+      [{item_id:req.decoded.id, item_type:"user"},
+      {item_id: notice.id, item_type:"sold_notice"}]
     );
     socketServices.emitNotificationOneUser(notification, user_id);
     return res.send(sendJsonWithTokens(req,processMessage));
-
   } catch (error) {
     return next(error);
   }
-
 });
 
 router.post("/answer_the_rating", async (req, res, next) =>{
@@ -162,9 +161,10 @@ router.post("/answer_the_rating", async (req, res, next) =>{
     const notification = new notificationModel(
       "Değerlendirmene cevap verildi.",
       `@${currentUser.username} değerlendirmene yanıt verdi: ${content}`,
-      notification_types.comment,
+      notification_types.rating,
       new Date(),
-      [currentUser.id, rating.rating_notice]
+      [{item_id:currentUser.id, item_type:"user"}, 
+      {item_id: rating.rating_notice, item_type: "sold_notice"}]
     );
     socketServices.emitNotificationOneUser(notification, rating.rater_user);
     return res.send(sendJsonWithTokens(req,"successfuly"));
@@ -207,17 +207,17 @@ router.post("/follow_user", async (req, res, next)=>{
   if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
   try {
 	
-	  const currentUserFollowsList = await userModel.findById(req.decoded.id).select("follows follows_count username");
-	  if(!currentUserFollowsList) return next(new Error("an error detected"));
-    if(currentUserFollowsList.follows.includes(user_id)) return next(new Error("you already following this user "));
-    await currentUserFollowsList.updateOne({$addToSet: {follows: user_id}, $inc: {follows_count: 1}});
+	  const currentUser = await userModel.findById(req.decoded.id).select("follows follows_count username");
+	  if(!currentUser) return next(new Error("an error detected"));
+    if(currentUser.follows.includes(user_id)) return next(new Error("you already following this user "));
+    await currentUser.updateOne({$addToSet: {follows: user_id}, $inc: {follows_count: 1}});
     
     const notification = new notificationModel(
       "Yeni bir takipçin var!",
-      `@${currentUserFollowsList.username} seni takip etmeye başladı.`,
-      notification_types.anotherUsers,
+      `@${currentUser.username} seni takip etmeye başladı.`,
+      notification_types.newFollower,
       new Date(),
-      currentUserFollowsList.id,
+      [{item_id:currentUser.id, item_type:"user"}]
     );
 
     socketServices.emitNotificationOneUser(notification, user_id);

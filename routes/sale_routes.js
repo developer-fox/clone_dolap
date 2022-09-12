@@ -100,27 +100,27 @@ router.post('/check_cart', async(req, res, next)=>{
         const firstSaleNotification= new notificationModel(
           "Tebrikler, ilk siparişini aldın!",
           "Tebrikler, ilk siparişini aldın! Nasıl kargolayacağını öğrenmek için tıkla.",
-          notification_types.order,
+          notification_types.firstSale,
           new Date(),
-          "", 
+          [{item_id: currentSaler.id, item_type: "user"}] 
           );
         socketServices.emitNotificationOneUser(firstSaleNotification, currentSaler.id);
       }
       const salerNotification = new notificationModel(
         "Tebrikler, Yeni bir siparişin var!", 
         "Tebrikler, Yeni bir siparişin var! Sipariş detayları için tıkla.",
-        notification_types.order,
+        notification_types.newSale,
         new Date(),
-        soldNotice.id, 
+        [{item_id: soldNotice.id, item_type: "sold_notice"}]
       );
       socketServices.emitNotificationOneUser(salerNotification, currentSaler.id);
       
       const buyerNotification = new notificationModel(
         "Siparişin onaylandı!",
         `${currentNotice.details.brand} marka ${currentNotice.details.category.detail_category} ürün siparişin onaylandı. Detayları görmek için tıkla.`,
-        notification_types.order,
+        notification_types.newOrder,
         new Date(),
-        soldNotice.id, 
+        [{item_id: soldNotice.id, item_type: "sold_notice"}]
       );
       socketServices.emitNotificationOneUser(buyerNotification, req.decoded.id);
     }
@@ -185,9 +185,9 @@ router.post("/cancel_buying", async (req, res, next)=>{
     const salerNotification = new notificationModel(
       "Alıcı siparişi iptal etti.",
       `@${sold_notice.buyer_user.username} ${sold_notice.notice.details.brand} ${sold_notice.notice.details.category.detail_category} siparişini iptal etti.`,
-      notification_types.order,
+      notification_types.orderCancel,
       new Date(),
-      sold_notice.id
+      [{item_id: sold_notice.id, item_type: 'sold_notice'}]
     );
     socketServices.emitNotificationOneUser(salerNotification,sold_notice.saler_user);
     return res.send(sendJsonWithTokens(req,"successfuly"));
@@ -241,9 +241,9 @@ router.post("/cancel_saling", async (req, res, next)=>{
     const buyerNotification = new notificationModel(
       "Satıcı siparişi iptal etti.",
       `@${sold_notice.saler_user.username} ${sold_notice.notice.details.brand} ${sold_notice.notice.details.category.detail_category} siparişini iptal etti.`,
-      notification_types.order,
+      notification_types.orderCancel,
       new Date(),
-      sold_notice.id
+      [{item_id: sold_notice.id, item_type: 'sold_notice'}]
     );
     socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user);
     return res.send(sendJsonWithTokens(req,"successfuly"));

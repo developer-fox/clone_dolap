@@ -20,7 +20,7 @@ module.exports = (io)=>{
         $inc: {unseen_notifications_count:1},
       });
 
-	    io.to(socket.socket_id).emit("notification",{notification_data: notificationModel});
+	    io.to(socket.socket_id).emit("notification",{notification_data: notificationModel.modelToNotificationNotation()});
     } catch (error) {
       throw error;
     }

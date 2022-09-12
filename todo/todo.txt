@@ -1,8 +1,4 @@
 * notice detail_categories js object writing
 * advanced error handling
-* get related accounts
-
-// signup actions
-/email validation with link
-
-* application get starting
+* deep linking
+* notification getter route update

@@ -279,3 +279,20 @@ module.exports.newTakenNoticeMail = (email, image_url,buyername,brand, amount,or
 	  throw error;
   }
 }
+
+module.exports.emailValidationMail = (email,username,deep_link)=>{
+  try {
+	  transporter.sendMail({
+	    to: email,
+	    from: process.env.MAIL,
+	    subject: "E posta adresini onayla",
+	    template: "validate_email",
+	    ctx:{
+        username: username,
+        deep_link: deep_link,
+      }
+	  });
+  } catch (error) {
+	  console.log(error);
+  }
+}

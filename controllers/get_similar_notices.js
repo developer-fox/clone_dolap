@@ -5,7 +5,7 @@ const notice_states=  require("../model/data_helper_models/notice_states");
 module.exports = async function(notice_id, selectedParameters,numberForEachSimilateLevel){
   try {
 	  const notice = await noticeModel.findById(notice_id);
-	  if(!notice) return next(new Error("notice not found"));
+	  if(!notice) throw new Error("notice not found");
 	
 	  const similarNoticesLevel1 = await noticeModel.find({
 	    "details.category.top_category": notice.details.category.top_category, 
@@ -42,6 +42,6 @@ module.exports = async function(notice_id, selectedParameters,numberForEachSimil
     return similarNotices;
 
   } catch (error) {
-	  return  next(error);
+	  throw error;
   }
 }

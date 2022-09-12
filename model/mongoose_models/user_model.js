@@ -6,7 +6,6 @@ const sizes_model = require('./sizes_model');
 const soldNoticeModel = require("./sold_notice_model");
 
 const userSchema = new mongoose.Schema({
-  // credit card informations will be added later"
   username: {type: String, required: true}, 
   phone_number : {type: String, required: true},
   email: {type: String, required: true},
@@ -63,10 +62,11 @@ const userSchema = new mongoose.Schema({
   },
   ratings_count: {type: Number, default: 0},
   notices: [{type: mongoose.SchemaTypes.ObjectId, default: [], ref: "notice"},],
-  notices_count: {type: Number, default: 0, required: true},
+  notices_count: {type: Number, default: 0,},
   average_send_time: {type: Number, required: false},
   is_validated_with_phone: {type: Boolean, default: false},
   is_validated_with_email: {type: Boolean, default: false},
+  email_validation_hashed_route: {type: String, required: false},
   enjoyed_campaings: [{
     type: mongoose.SchemaTypes.ObjectId,
     default: [],
@@ -130,10 +130,11 @@ const userSchema = new mongoose.Schema({
     default: [],
   },
   sold_notices_count: {type: Number, default: 0},
+  most_favorite_category_for_looking : {type: String}, 
+  most_favorite_category_for_saling : {type: String}, 
   user_looked_notices: {
     type: [mongoose.SchemaTypes.ObjectId],
     default: [],
-    required: true,
   },
   homepage_notices: {type: [mongoose.SchemaTypes.ObjectId], ref:"notice"},
   cart: {

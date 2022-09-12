@@ -187,6 +187,7 @@ router.get("/get_favorites/:page", async (req, res, next)=>{
   }  
 })
 
+//TODO: add notification
 router.post("/add_to_favorites", async (req, res, next)=>{
   let idToBeAdded = req.body.new_favorite_notice_ids;
   if(!idToBeAdded || idToBeAdded.length === 0) {
@@ -388,7 +389,7 @@ router.get("/get_saling_offers", async (req, res, next)=>{
 
 router.get("/get_buying_offers", async (req, res, next)=>{
   try {
-    const datas = await user_model.findById(req.decoded.id).select("buying_offers -_id");
+    const datas = await user_model.findById(req.decoded.id).select("buying_offers _id");
     return res.send(sendJsonWithTokens(req,datas));
   } catch (error) {
     return next(error);
@@ -431,7 +432,7 @@ router.post("/decline_offer", async (req, res, next)=>{
       `@${user.username} ${notice.details.category.detail_category} kategorisindeki ${notice.details.brand} marka ürüne verdiğin ${buyerOffer.price} TL'lik teklifi reddetti`,
       notification_types.offer,
       new Date(),
-      notice.id
+      [{item_id: notice.id, item_type:"notice"}]
     );
     socketServices.emitNotificationOneUser(notification,proposer.id);
 
@@ -505,7 +506,7 @@ router.post("/send_saling_offer", async (req, res, next) => {
           `@${saler.username}, ${notice.detail.brand} marka ürünü için sana özel ${price} TL'lik teklif verdi.`,
           notification_types.offer,
           new Date(),
-          notice.id,
+          [{item_id:notice.id, item_type: "notice"}]
         )
         socketServices.emitNotificationOneUser(notification,buyer.id);
         return res.send(sendJsonWithTokens(req, "successfuly"));
@@ -556,7 +557,7 @@ router.post("/accept_offer", async (req, res, next)=>{
       `@${saler.username}, ${notice.details.brand} marka ${notice.details.category.detail_category} ürünü için yaptığın teklifi kabul etti.`,
       notification_types.offer,
       new Date(),
-      notice_id
+      [{item_id: notice_id, item_type: "notice"}]
     );
 
     socketServices.emitNotificationOneUser(notification,proposer.id);
@@ -610,7 +611,7 @@ router.post("/accept_saling_offer", async(req, res, next) => {
       `@${user.username} ${ details.brand} marka ${details.category.detail_category} ürünün için verdiğin ${offer.price} TL'lik teklifi kabul etti.`,
       notification_types.offer,
       new Date(),
-      notice.id,
+      [{item_id:notice.id, item_type: "notice"}]
     )
     socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
@@ -662,7 +663,7 @@ router.post("/decline_saling_offer", async(req, res, next) => {
       `@${user.username} ${ details.brand} marka ${details.category.detail_category} ürünün için verdiğin ${offer.price} TL'lik teklifi reddetti.`,
       notification_types.offer,
       new Date(),
-      notice.id,
+      [{item_id: notice.id,item_type: "notice"}]
     )
     socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
     return res.send(sendJsonWithTokens(req,"successfuly"));
@@ -738,9 +739,8 @@ router.post("/add_looked_notice", async (req, res, next)=>{
 	      },
 	    }
 	  }, {new: true});
-
 	  
-    if( result.user_looked_notices.length === 7){
+    if( result.user_looked_notices.length === 10){
       await result.updateOne({$pop: {user_looked_notices: 1},});
     }
 
@@ -802,7 +802,6 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
         skip: (page -1)*10,
       }
     })
-
 	  return res.send(sendJsonWithTokens(req, {
 	    notices: populatedResult.homepage_notices
 	  }));
@@ -825,6 +824,10 @@ router.post("/stand_out", async (req, res, next)=>{
     if(notice.is_featured) return next(new Error("this notice is already standed out"));
     if(notice.saler_user.own_use_trending === 0) return next(new Error("you have not any standing out 	justification "));
 
+    await user_model.findByIdAndUpdate(req.decoded.id,{
+      $inc: {own_use_trending: -1}
+    });
+
     await notice.updateOne({
       $set: {
         is_featured: true,
@@ -837,6 +840,39 @@ router.post("/stand_out", async (req, res, next)=>{
   } catch (error) {
     return next(error);
   }
+})
+
+router.get("/get_notifications", async(req, res, next)=>{
+  try {
+	  const user = await user_model.findById(req.decoded.id).select("notifications");
+	  const notifications = user.notifications.sort(function(a,b){
+	    return  Date.parse(b.notification_date) - (a.notification_date); 
+	  });
+    return res.send(sendJsonWithTokens(req,{data: notifications}));
+  } catch (error) {
+    return next(error);
+  }
+
+
+
+
+})
+
+router.get("/get_related_accounts/:page", async (req, res, next)=>{
+  try {
+    const page = req.params.page;
+    if(Number.isNaN(Number.parseInt(page)) || Number.parseInt(page)<= 0) return next(new Error("invalid page number"));
+	  const currentUser = await user_model.findById(req.decoded.id).select("most_favorite_category_for_looking");
+	  const accounts = await user_model.find({most_favorite_category_for_saling: currentUser.most_favorite_category_for_looking}).skip((page -1)*10).limit(10).select("username profile_photo ratings_count saler_score").populate({
+      path: "notices",
+      select: "profile_photo favorites_count details.brand price_details.saling_price",
+      limit: 5
+    });
+    return res.send(sendJsonWithTokens(req,{accounts: accounts}));
+  } catch (error) {
+    return next(error);
+  }
+
 })
 
 module.exports = router;

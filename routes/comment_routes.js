@@ -55,7 +55,7 @@ router.post("/add_comment",  async (req, res, next)=>{
       `@${user.username} yorum yaptı: ${content}`,
       notification_types.comment,
       new Date(),
-      [user.id, notice.id],
+      [{item_id:user.id, item_type:"user"}, {item_id:notice.id, item_type:"notice"}],
     );
     socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
 
@@ -99,7 +99,7 @@ router.post("/add_answer",  async (req, res, next)=>{
       `"${content}"`,
       notification_types.comment,
       new Date(),
-      [user.id, notice.id],
+      [{item_id:user.id, item_type:"user"}, {item_id:notice.id, item_type:"notice"}],
     );
     socketServices.emitNotificationOneUser(notification,commenter_user.id);
 	  return res.send(sendJsonWithTokens(req,"successfuly"));

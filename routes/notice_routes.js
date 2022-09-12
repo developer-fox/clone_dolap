@@ -15,19 +15,17 @@ const couponStates = require('../model/data_helper_models/coupon_states.js');
 const fs = require("fs");
 const commentsRouter = require("./comment_routes");
 const notice_states = require('../model/data_helper_models/notice_states');
-const { $where } = require('../model/mongoose_models/notice_model');
 const get_similar_notices = require('../controllers/get_similar_notices');
 const offer_states = require('../model/data_helper_models/offer_states');
 const router = express.Router();
 const fileService = require('../services/file_services');
-const { json } = require('express');
 const timeoutService = require('../services/timeout_services');
 const mailServices = require('../services/mail_services');
 const socketManager = require("../services/socket_manager");
 const socketServices = require("../services/socket_services")(socketManager.getIo());
 const notification_types = require("../model/data_helper_models/notification_types");
 const notificationModel = require("../model/data_helper_models/notification_model");
-
+const getUserMostFavoriteCategories = require("../controllers/get_user_most_favorite_categories");
 
 router.post("/add_notice", async (req, res, next)=>{
 
@@ -96,7 +94,25 @@ router.post("/add_notice", async (req, res, next)=>{
       return next(new Error("ürün satış için hazırlanırken hata oluştu."));
     }
     else{
-      const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {notices: access._id}, $inc: {notices_count: 1}});
+      const user = await userModel.findById(req.decoded.id).select("followers username");
+
+      for await(let follower of user.followers){
+        const notification = new notificationModel(
+          `@${user.username} yeni bir ürün ekledi.`,
+          `Takip ettiğin @${user.username}, dolabına yeni bir ürün ekledi!`,
+          notification_types.followingUserAddedNewNotice,
+          new Date(),
+          [{item_id: newNotice.id, item_type: "notice",},],
+        )
+        socketServices.emitNotificationOneUser(notification,follower);  
+      }
+      
+      const result = await user_model.findByIdAndUpdate(req.decoded.id, 
+        {$addToSet: {notices: access._id}, $inc: {notices_count: 1},},{new: true});
+      
+      await user_model.findByIdAndUpdate(req.decoded.id, {
+        $set: {most_favorite_category_for_saling: await getUserMostFavoriteCategories.forSaling(req.decoded.id)}
+      });  
       return res.send(sendJsonWithTokens(req, "successfuly"));
     }
   } catch (error) {
@@ -148,7 +164,6 @@ router.post("/update_notice_photos",fileService.updateNoticeImages,async(req, re
   }
 })
 
-//*
 router.post("/price_cut" ,async(req, res, next)=>{
   const notice_id = req.body.notice_id;
   let new_price = req.body.new_price;
@@ -191,9 +206,9 @@ router.post("/price_cut" ,async(req, res, next)=>{
       const notification = new notificationModel(
         `Beğendiğin ürünün fiyatı düştü!`,
         `${notice.details.brand} marka ${notice.details.category.detail_category} ürününün fiyatı ${notice.price_details.saling_price} TL'den ${not.price_details.saling_price} TL'ye düştü.`,
-        notification_types.offer,
+        notification_types.priceCut,
         new Date(),
-        notice.id,
+        [{item_id: notice.id,item_type: "notice"}]
       );
       socketServices.emitNotificationOneUser(notification, user.id);
     }
@@ -282,9 +297,12 @@ router.post("/add_to_favorites", async (req, res, next)=>{
       const notification = new notificationModel(
         `@${user.username} ürününü beğendi!`,
         `Dilersen ona özel bir satış teklifi gönderebilirsin.`,
-        notification_types.anotherUsers,
+        notification_types.noticeLiked,
         new Date(),
-        [user.id, notice_id],
+        [
+          {item_id: user.id,item_type: "user"}, 
+          {item_id: notice_id, item_type: "notice"},
+        ],
       );
       socketServices.emitNotificationOneUser(notification, notice.saler_user.id);
       return res.send(sendJsonWithTokens(req,"successfuly"));
@@ -326,13 +344,21 @@ router.post("/report_notice" , async (req, res, next)=>{
 })
 
 router.get("/notice_details",async (req, res, next)=>{
-  const notice_id = req.body.notice_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-
-  const notice = await noticeModel.findById(notice_id).select("-price_details.buying_price -offers").populate("saler_user","profile_photo username is_validated saler_score last_seen").populate("favorited_users", "profile_photo username");
-  return res.send(sendJsonWithTokens(req, notice));
-
+  try {
+	  const notice_id = req.body.notice_id;
+	  if(!notice_id) return next(new Error("notice id cannot be empty"));
+	  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+	
+	  const notice = await noticeModel.findById(notice_id).select("-price_details.buying_price -offers -photos_replace_count -offers_count").populate("saler_user","profile_photo username is_validated saler_score").populate("favorited_users", "profile_photo username").updateOne({
+	    $inc: {displayed_count: 1},
+	  });
+	  await userModel.findByIdAndUpdate(req.decoded.id, {
+	    $set: {most_favorite_category_for_looking: await getUserMostFavoriteCategories.forLooking(req.decoded.id)}
+	  });
+	  return res.send(sendJsonWithTokens(req, notice));
+  } catch (error) {
+    return next(error);
+  }
 })
 
 router.post("/give_offer",async (req, res, next)=>{
@@ -343,7 +369,7 @@ router.post("/give_offer",async (req, res, next)=>{
   if(!price || price<1) return next(new Error("price cannot be empty"));
 
   try {
-	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price price_details.selling_with_offer offers state profile_photo details.brand details.category.detail_category").populate("saler_user","email");
+	  const notice = await noticeModel.findById(notice_id).select("saler_user price_details.saling_price price_details.selling_with_offer offers state profile_photo details.brand details.category.detail_category favorited_users").populate("saler_user","email");
     if(notice.state != notice_states.takable) return next(new Error("you cant give an offer for this notice"));
     if(!notice._id) return next(new Error("notice not found"));
     if(!notice.price_details.selling_with_offer) return next(new Error("you cant give offer for this notice")); 
@@ -377,12 +403,24 @@ router.post("/give_offer",async (req, res, next)=>{
 
     const notification = new notificationModel(
       "Yeni bir teklifin var!",
-      `@${proposer.username} ${details.brand} marka ${details.category.detail_category} ürünün için ${price} TL'lik bir teklif verdi.`,
+      `@${proposer.username} ${notice.details.brand} marka ${notice.details.category.detail_category} ürünün için ${price} TL'lik bir teklif verdi.`,
       notification_types.offer,
       new Date(),
-      notice_id
+      [{item_id: notice_id, item_type: "notice"}],
     );
     socketServices.emitNotificationOneUser(notification, notice.saler_user.id);
+
+    for await (const likedUser of notice.favorited_users){
+      const gaveUserNotification = new notificationModel(
+        "Beğendiğin ürüne teklif verildi!",
+        `Beğendiğin ürüne teklif var, satılmak üzere, acele et!`,
+        notification_types.anotherUserGaveOffer,
+        new Date(),
+        [{item_id: notice.id, item_type: "notice"}],
+      );
+      socketServices.emitActivationInfoToAnotherUsers(gaveUserNotification, likedUser);
+    }
+
     return res.send(sendJsonWithTokens(req,"successfuly"));
   } catch (error) {
     return next(error);

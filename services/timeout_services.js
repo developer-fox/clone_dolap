@@ -129,9 +129,9 @@ module.exports.soldNoticeToCargo = (sold_notice_id)=>{
         const buyerNotification = new notificationModel(
           "Siparişin Kargoya verildi.",
           `${currentNotice.details.brand} marka ${currentNotice.details.category.detail_category} ürün satıcı tarafından kargoya verildi. Detayları görmek için tıkla.`,
-          notification_types.order,
+          notification_types.orderInfo,
           new Date(),
-          currentNotice.id, 
+          [{item_id: sold_notice_id, item_type:"sold_notice"}]
         );
         socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user);
 
@@ -163,10 +163,10 @@ module.exports.soldNoticeToDelivered = (sold_notice_id)=>{
       const buyerNotification = new notificationModel(
         "Siparişin teslim edildi.",
         `${currentNotice.details.brand} marka ${currentNotice.details.category.detail_category} ürünün ${sold_notice.contact_informations.name} ${sold_notice.contact_informations.surname} tarafından teslim alındı. İyi günlerde kullanın!`,
-        notification_types.order,
+        notification_types.orderInfo,
         new Date(),
-        currentNotice.id, 
-      );
+        [{item_id: sold_notice_id, item_type:"sold_notice"}]
+        );
       socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user.id);
     } catch (error) {
       throw error;
