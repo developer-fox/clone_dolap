@@ -1,7 +1,8 @@
 const ms = require("ms");
 const jwt = require("jsonwebtoken");
+const error_types = require("../model/api_models/error_types");
+const error_handling_services = require("./error_handling_services");
 
-const error_messages = require("../model/api_models/error_messages");
 const envs = require("dotenv").config();
 
 module.exports.validateJwt = async (req,res,next) => {
@@ -11,7 +12,7 @@ module.exports.validateJwt = async (req,res,next) => {
   // validating token nullability
   if(!token) {
     // if token is null go to the errors mw and send the error message
-    return next(new Error(error_messages.notFoundToken));
+    return next(new Error(error_handling_services(error_types.jwtNotFound)));
   }
   else{
     // verifying token
@@ -20,10 +21,9 @@ module.exports.validateJwt = async (req,res,next) => {
       req.decoded = decoded;
       return next();
     } catch (error) {
-      if(error.message== error_messages.expiredJwtToken){
+      if(error.message== "jwt expired"){
         // creating new token
         try {
-          console.log(error.message);
            const newToken = await this.createNewJwtTokenWithRefreshToken(refreshToken);
            req.token = newToken;
            const decoded = await jwt.decode(req.token);
@@ -33,7 +33,6 @@ module.exports.validateJwt = async (req,res,next) => {
           return next(error);
         }
       }
-      console.log(error);
       return next(error);
     }
   }
@@ -53,9 +52,9 @@ module.exports.createNewJwtTokenWithRefreshToken = async (refreshToken)=>{
     const newToken = jwt.sign({id: validatingRefreshToken.id},process.env.JWT_SECRET_KEY, {expiresIn: "3h"});
     return newToken;
   } catch (error) {
-    if(error.message == error_messages.expiredJwtToken){
+    if(error.message == "jwt expired"){
       //TODO: redirecting authentication again
-      throw new Error("refresh token is expired so authentication required");
+      throw new Error(error_handling_services(error_types.expiredRefreshToken,""));
     }
     else{
       throw error;

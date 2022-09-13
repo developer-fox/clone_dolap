@@ -1,11 +1,11 @@
 
-const notification_types = require('./notification_types');
 class notificationModel{
   constructor(title,subtitle,type,date,items){
     this.title = title;
     this.subtitle = subtitle;
     this.type = type;
     this.date = date;
+    // [items] = [{item_id: _id, item_type: "item_type"}];
     this.items = items;
   };
 
@@ -17,13 +17,6 @@ class notificationModel{
       notification_date: this.date,
       notification_items: this.items, 
     };
-  }
-
-  modelToNotificationNotation(){
-    return {
-      title: this.title,
-      type: this.type
-    }
   }
 
 };

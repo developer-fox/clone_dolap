@@ -1,7 +1,6 @@
 "use strict"
 const validator = require("express-validator");
 const { saveNewUser, isEmailNotUsing } = require("../data_access/authentication_access");
-const error_messages = require("../model/api_models/error_messages");
 const newUser = require("../model/api_models/registering_user");
 const express = require("express");
 const bcrypt = require("bcrypt");
@@ -11,10 +10,12 @@ const { response } = require("express");
 const user_model = require("../model/mongoose_models/user_model");
 const login_types = require("../model/api_models/login_types");
 const { sendJsonWithTokens } = require("../services/response_sendjson");
+const error_types = require("../model/api_models/error_types");
+const error_handling_services = require("../services/error_handling_services");
 
 module.exports.signupController = async function (req, res, next) {
   if(req.token != null){
-     const err = new Error("user already logged in");
+     const err = new Error(error_handling_services(error_types.logicalError,"user already logged in"));
     return next(err);
   };
   let errors = validator.validationResult(req);
@@ -25,7 +26,7 @@ module.exports.signupController = async function (req, res, next) {
   try {
     const search = await isEmailNotUsing(req.body.email);
     if(!search) {
-      return next(new Error(error_messages.emailUsing));
+      return next(new Error(error_handling_services(error_types.logicalError,"this email is already using")));
     }
     const password = await bcrypt.hash(req.body.password, 12);
     const email = req.body.email;
@@ -34,7 +35,7 @@ module.exports.signupController = async function (req, res, next) {
     const user = new newUser(username, password, email, phoneNumber);
     let current_user = await user.saveToDatabase();
     const tokens = tokenService.createJwtToken(username, email, current_user._id);
-    return res.status(201).send(tokens);
+    return res.send(tokens);
   } catch (error) {
     return next(error);
   }
@@ -47,50 +48,53 @@ module.exports.loginController = async (req, res, next) => {
   }
 
   if(req.headers["x-access-token"] || req.headers["x-access-refresh-token"]){
-    return next(new Error("user already logined"));
+    return next(new Error(error_handling_services(error_types.logicalError,"user already logged in")));
   }
   let userInDb;
   if(req.url == "/login_with_email"){
     const email = req.body.email;
     userInDb = await user_model.findOne({email: email});
     if(!userInDb){
-      return next(new Error("user not found(email)"));
+      return next(new Error(new Error(error_handling_services(error_types.dataNotFound,"user"))));
     }
   }
   else if(req.url == "/login_with_username"){
     const username = req.body.username;
     userInDb = await user_model.findOne({username: username});
     if(!userInDb){
-      return next(new Error("user not found(username)"));
+      return next(new Error(new Error(error_handling_services(error_types.dataNotFound,"user"))));
     }
   } 
   else{
-    return next(new Error("undefined login type"));
+    return next(new Error(new Error(error_handling_services(error_types.invalidValue,req.url))));
   }
     const password = req.body.password;
     const passwordCompare = await bcrypt.compare(password, userInDb.password);
     //const passwordCompare = password === userInDb.password;
     if(!passwordCompare){
-      return next(new Error("email veya kullanıcı adı hatalı"));
+      return next(new Error(new Error(error_handling_services(error_types.invalidValue,"password or email"))));
     }
 
   const tokens = tokenService.createJwtToken(userInDb.username, userInDb.email, userInDb._id);
-  return res.status(202).send({
-    info: "successfuly logined!",
+  return res.send({
+    info: error_types.success,
     tokens
   });
 }
 
 module.exports.newPasswordController = async (req, res, next)=>{
-  const user = await user_model.findOne({email: req.decodedJwt.email});
-  const passwordComparing = await bcrypt.compare(req.body.newPassword, user.password);
-  if(passwordComparing){
-    return next(new Error("please select different password from old password"));
+  try {
+	 const user = await user_model.findOne({email: req.decodedJwt.email});
+	  const passwordComparing = await bcrypt.compare(req.body.newPassword, user.password);
+	  if(passwordComparing){
+	    return next(new Error(error_handling_services(error_types.invalidValue,"password")));
+	  }
+	  const hashedNewPassword = await bcrypt.hash(req.body.newPassword, 12);
+	  const result = await user.updateOne({$set: {password: hashedNewPassword}});
+	  if(result.modifiedCount){
+	    return res.send(sendJsonWithTokens(req, error_types.success));
+	  }
+  } catch (error) {
+    return next(error);
   }
-  const hashedNewPassword = await bcrypt.hash(req.body.newPassword, 12);
-  const result = await user.updateOne({$set: {password: hashedNewPassword}});
-  if(result.modifiedCount){
-    return res.send(sendJsonWithTokens(req, "password changing finished successfuly!"));
-  }
-  return next(new Error("error expected"));
 }

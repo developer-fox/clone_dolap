@@ -1,10 +1,12 @@
 
 const express = require("express");
+const error_types = require("../model/api_models/error_types");
 const notice_get_filters = require("../model/data_helper_models/notice_get_filters");
 const notice_get_sorting_parameters = require("../model/data_helper_models/notice_get_sorting_parameters");
 const notice_states = require("../model/data_helper_models/notice_states");
 const notice_model = require("../model/mongoose_models/notice_model");
 const user_model = require("../model/mongoose_models/user_model");
+const error_handling_services = require("../services/error_handling_services");
 const filtering_service = require("../services/filtering_service");
 const { sendJsonWithTokens } = require("../services/response_sendjson");
 const sorting_service = require("../services/sorting_service");
@@ -85,7 +87,7 @@ router.get("/get_last_search/:page", async (req, res, next)=>{
   const filters = req.body.filters;
   const sorting = req.body.sorting;
 
-  if(Number.isNaN(Number.parseInt(page))) return next(new Error("page must be a number"));
+  if(Number.isNaN(Number.parseInt(page))) return next(new Error(error_handling_services(error_types.invalidValue,page)));
   try {
     if(!filters && !sorting){
       const lastSearchedItems = await user_model.findById(req.decoded.id).select("last_search").populate({
@@ -100,12 +102,12 @@ router.get("/get_last_search/:page", async (req, res, next)=>{
       if(filters){
         Object.keys(filters).forEach(key=>{
           if(!notice_get_filters.includes(key)){
-            return next(new Error("undefined filter parameter"));
+            return next(new Error(error_handling_services(error_types.invalidValue,key)));
           }
         })
       }    
       if(sorting && !Object.values(notice_get_sorting_parameters).includes(sorting)){
-        return next(new Error("undefined sorting parameter"));
+        return next(new Error(error_handling_services(error_types.invalidValue,sorting)));
       }
     
       let result;
@@ -120,7 +122,6 @@ router.get("/get_last_search/:page", async (req, res, next)=>{
         result = sorting_service(notices,sorting);
       }
       return res.send(sendJsonWithTokens(req,result.slice((page-1)*15, (page*15)),));
-
     }
   } catch (error) {
     return next(error);

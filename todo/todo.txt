@@ -1,4 +1,3 @@
 * notice detail_categories js object writing
 * advanced error handling
 * deep linking
-* notification getter route update

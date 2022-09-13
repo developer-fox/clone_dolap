@@ -27,6 +27,9 @@ const socket_model = require("../model/mongoose_models/socket_model");
 const notification_schema = require("../model/mongoose_models/notification_schema");
 const notificationModel = require("../model/data_helper_models/notification_model");
 const notification_types = require("../model/data_helper_models/notification_types");
+const notification_items_getter = require("../controllers/notification_items_getter");
+const error_handling_services = require("../services/error_handling_services");
+const error_types = require("../model/api_models/error_types");
 
 
 router.get("/get_profile_info", async (req, res, next)=>{
@@ -42,11 +45,11 @@ router.post("/change_profile_photo", fileService.updateUserImage,async (req, res
   const path =   `${process.env.URL}/docs/user*${req.filePath.split("/")[2]}`;
   try {
 	  const user = await user_model.findById(req.decoded.id).select("profile_photo profile_photo_replace_count");
-	  if(!user) return next(new Error("user not found"));
+	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
     if(user.profile_photo != ""){
       await fs.rm(user.profile_photo, {recursive: true},err => {
 	      if (err) {
-	        throw err
+	        return next(err);
 	      }
 	    });
     }
@@ -55,7 +58,7 @@ router.post("/change_profile_photo", fileService.updateUserImage,async (req, res
       $inc: {profile_photo_replace_count: 1}
     },{new: true});
 
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }  
@@ -65,12 +68,11 @@ router.delete("/delete_profile_photo",async(req, res, next) =>{
 
   try {
     const user = await user_model.findById(req.decoded.id).select("profile_photo profile_photo_replace_count");
-    if(!user) return next(new Error("user not found"));
-    if(user.profile_photo == "") return next(new Error("user already not have profile image"));
-
+    if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
+    if(user.profile_photo == "") return next(new Errorerror_handling_services(error_types.logicalError,"user already have not profile photo"));
     await fs.rm(user.profile_photo, {recursive: true},err => {
       if (err) {
-        throw err
+        return next(err);
       }
     });
     
@@ -89,12 +91,12 @@ router.post("/change_profile_info", async (req, res, next)=>{
   let newDatas = {};
 
   if(Object.keys(req.body).length === 0){
-    return next(new Error("not detected any change request"));
+    return next(new Error(new Error(error_handling_services(error_types.dataNotFound,"body"))));
   }
 
   for(let key of Object.keys(req.body)){
     if(!supportedChangableDatas.includes(key)){
-      return next(new Error("unsupported data change activity request"));
+      return next(new Error(error_handling_services(error_types.invalidValue,key)));
     }
   }
 
@@ -102,42 +104,42 @@ router.post("/change_profile_info", async (req, res, next)=>{
     switch (key) {
       case "email":
         if(!validator.isEmail(req.body.email)){
-          return next(new Error("invalid email type"));
+          return next(new Error(error_handling_services(error_types.invalidValue,key)));
         }
         newDatas.email = req.body.email;
         break;
       case "username":
         if(!validator.isLength(req.body.username, {min:6,  max: 18})){
-          return next(new Error("invalid username type"));
+          return next(new Error(error_handling_services(error_types.invalidValue,key)));
         }
         newDatas.username = req.body.username;
         break;
       case "phone_number":
         if(!validator.isMobilePhone(req.body.phone_number)){
-          return next(new Error("invalid phone number"));
+          return next(new Error(error_handling_services(error_types.invalidValue,key)));
         }
         newDatas.phone_number = req.body.phone_number;
         break;
       case "profile_photo":
         if(validator.isEmpty(req.body.profile_photo)){
-          return next(new Error("invalid photo name"));
+          return next(new Error(error_handling_services(error_types.invalidValue,key)));
         }
         newDatas.profile_photo = req.body.profile_photo;
         break;
       case "profile_description":
         if(validator.isEmpty(req.body.profile_description)){
-          return next(new Error("invalid profile description"));
+          return next(new Error(error_handling_services(error_types.invalidValue,key)));
         }
         newDatas.profile_description = req.body.profile_description;
         break;
       default:
-        return next("undefined error");
+        return next(new Error(error_handling_services(error_types.invalidValue,key)));
     }
   })
 
   try {
-    var result = await user_model.findOneAndUpdate({email: req.decoded.email}, {$set: newDatas});
-    return res.send(sendJsonWithTokens(req, "successfuly"));
+    await user_model.findById(req.decoded.id, {$set: newDatas});
+    return res.send(sendJsonWithTokens(req, error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -145,7 +147,8 @@ router.post("/change_profile_info", async (req, res, next)=>{
 
 router.get("/get_addresses", async (req, res, next)=>{
   try {
-	const addresses = await user_model.findOne({email: req.decoded.email}).select("addresses");
+	const addresses = await user_model.findById(req.decoded.
+  id).select("addresses");
   return res.send(sendJsonWithTokens(req, addresses));
 } catch (error) {
 	return next(error);
@@ -159,8 +162,8 @@ router.post("/add_address", async (req, res, next)=>{
     address_informations : req.body.address_informations ?? "undefined ??",
   }
   try {
-	  const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {addresses: new_address}});
-    return res.send(sendJsonWithTokens(req, "successfuly"));
+	  await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {addresses: new_address}});
+    return res.send(sendJsonWithTokens(req, error_types.success));
   } catch (error) {
 	return next(error);
   }
@@ -175,7 +178,7 @@ router.get("/get_favorites/:page", async (req, res, next)=>{
 
     const pageCount = Math.ceil(favorites.favorites.length/10);
 
-    if(page > pageCount && pageCount> 0) return next(new Error("page parameter cant be big than pages count"));
+    if(page > pageCount && pageCount> 0) return next(new Error(new Error(error_handling_services(error_types.invalidValue,pageCount.toString()))));
   
     let getFavoritesWithPagination = favorites.favorites.slice((page-1)*10, (page*10));
     return res.send(sendJsonWithTokens(req,{
@@ -199,10 +202,10 @@ router.post("/add_to_favorites", async (req, res, next)=>{
   
   for(id of idToBeAdded) {
     if(!mongoose.isValidObjectId(id)){
-      return next(new Error("invalid notice id(s)"));
+      return next(new Error(new Error(error_handling_services(error_types.invalidValue,id))));
     }
     if(user.favorites.includes(id)){
-      return next(new Error("this notice is already in your favorites"));
+      return next(new Error(error_handling_services(error_types.logicalError,"this notice already in favorites list of user")));
     } 
   }
 
@@ -215,8 +218,8 @@ router.post("/add_to_favorites", async (req, res, next)=>{
     });
   });
   try {
-	  let process = await user_model.findByIdAndUpdate(req.decoded.id, {$push: {favorites: idToBeAdded}, $inc: {favorites_count: idToBeAdded.length}});
-    return res.send(sendJsonWithTokens(req, "notices successfuly added to favorites"));
+	  await user_model.findByIdAndUpdate(req.decoded.id, {$push: {favorites: idToBeAdded}, $inc: {favorites_count: idToBeAdded.length}});
+    return res.send(sendJsonWithTokens(req, error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -224,7 +227,7 @@ router.post("/add_to_favorites", async (req, res, next)=>{
 
 router.get("/get_coupons", async (req, res, next)=>{
   try {
-    const coupons = await user_model.findOne({email: req.decoded.email}).select("user_coupons -_id").populate("user_coupons.coupon");
+    const coupons = await user_model.findOne(req.decoded.id).select("user_coupons").populate("user_coupons.coupon");
 
     return res.send(sendJsonWithTokens(req, {coupons: coupons._doc.user_coupons}));
   } catch (error) {
@@ -234,7 +237,7 @@ router.get("/get_coupons", async (req, res, next)=>{
 
 router.get("/get_brands", async (req, res, next)=>{
   try {
-	  const result = await user_model.findOne({email: req.decoded.email}).select("brands -_id");
+	  const result = await user_model.findOne({email: req.decoded.email}).select("brands");
 	  return res.send(sendJsonWithTokens(req, {brands: result._doc.brands}));
   } catch (error) {
     return next(error);
@@ -244,19 +247,19 @@ router.get("/get_brands", async (req, res, next)=>{
 router.post("/add_brands", async (req, res, next)=>{
   const new_brands= req.body.new_brands;
   if(!new_brands){
-    return next(new Error("Invalid brands information"));
+    return next(new Error(error_handling_services(error_types.invalidValue,new_brands)));
   }
     
   new_brands.forEach((element)=>{
     if(!Object.values(brandsList).includes(element)){
-      return next(new Error(`undefined brand ${element}`));
+      return next(new Error(error_handling_services(error_types.invalidValue,element)));
     }
   })
 
   try {
 	  const result = await user_model.updateOne({email: req.decoded.email}, {$push: {brands: new_brands}});
     console.log(result);
-    return res.send(sendJsonWithTokens(req, "new brands added succesfuly"));
+    return res.send(sendJsonWithTokens(req, error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -265,7 +268,7 @@ router.post("/add_brands", async (req, res, next)=>{
 router.post("/add_sizes", async (req, res, next)=>{
 
   if(!req.body.sizes){
-    return next(new Error("Invalid json type"));
+    return next(new Error(error_handling_services(error_types.invalidValue,"body of request")));
   }
 
   const top_sizes = Object.keys(notice_sizes);
@@ -287,25 +290,25 @@ router.post("/add_sizes", async (req, res, next)=>{
 	  let medium_size = element.medium_size;
 	  let bottom_size = element.bottom_size;
     if(!top_size || !medium_size || !bottom_size){
-      return next(new Error("invalid size category(es)"));
+      return next(new Error(error_handling_services(error_types.invalidValue,element,notice_s)));
     }
 
     if(!top_sizes.includes(top_size)){
-	    return next(new Error("undefined size category(top)"));
+	    return next(new Error(error_handling_services(error_types.invalidValue,top_size)));
 	  }
 	
 	  if(!medium_sizes.includes(medium_size)){
-	    return next(new Error("undefined size category(medium)"))
+	    return next(new Error(error_handling_services(error_types.invalidValue,medium_size)))
 	  }
 	  
 	  if(!(bottom_sizes[medium_sizes.indexOf(medium_size)].includes(bottom_size))){
-	    return next(new Error("undefined size(bottom)"));
+	    return next(new Error(error_handling_services(error_types.invalidValue,bottom_size)));
 	  }
 	
   });
 
   try {
-	  const result = await user_model.findOneAndUpdate({email: req.decoded.email}, {$push: {sizes: req.body.sizes}});
+	  const result = await user_model.findByIdAndUpdate(req.decoded.id, {$push: {sizes: req.body.sizes}});
     return res.send(sendJsonWithTokens(req, result));
   } catch (error) {
 	  return next(error);
@@ -333,7 +336,7 @@ router.get("/get_sizes_all", async (req, res, next)=>{
     },
   };
   try {
-	  const datas = await user_model.findOne({email: req.decoded.email}).select("sizes -_id");
+	  const datas = await user_model.findById(req.decoded.id).select("sizes");
 	  for(let data of datas.sizes){
 	    let i = data._doc;
 	    result[i.top_size][i.medium_size].push(i.bottom_size);
@@ -349,12 +352,12 @@ router.get("/get_sizes_spesific/:top_size/:medium_size", async (req, res, next)=
   let medium_size= req.params.medium_size;
 
   if(!top_size || !medium_size){
-    return next(new Error("top body and medium body are not nullable"));
+    return next(new Error(error_handling_services(error_types.invalidValue,"size informations")));
   }
 
   try {
     const sizes = [];
-    const result = await user_model.findById(req.decoded.id).select("sizes -_id");
+    const result = await user_model.findById(req.decoded.id).select("sizes");
 
     for(let data of result.sizes){
       const i = data._doc;
@@ -363,7 +366,6 @@ router.get("/get_sizes_spesific/:top_size/:medium_size", async (req, res, next)=
         sizes.push(i);
       }
     }
-
 
     return res.send(sendJsonWithTokens(req, sizes));
   } catch (error) {
@@ -381,7 +383,7 @@ router.get("/get_saling_offers", async (req, res, next)=>{
       offers.push(...item.offers);
     });
 
-    return res.send(sendJsonWithTokens(req,{saling_offers: offers}));
+    return res.send(sendJsonWithTokens(req,offers));
   } catch (error) {
     return next(error);
   }
@@ -389,7 +391,7 @@ router.get("/get_saling_offers", async (req, res, next)=>{
 
 router.get("/get_buying_offers", async (req, res, next)=>{
   try {
-    const datas = await user_model.findById(req.decoded.id).select("buying_offers _id");
+    const datas = await user_model.findById(req.decoded.id).select("buying_offers");
     return res.send(sendJsonWithTokens(req,datas));
   } catch (error) {
     return next(error);
@@ -399,19 +401,19 @@ router.get("/get_buying_offers", async (req, res, next)=>{
 router.post("/decline_offer", async (req, res, next)=>{
   const notice_id = req.body.notice_id;
   const offer_id = req.body.offer_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!offer_id) return next(new Error("offer id cannot be empty"));
-  if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.invalidValue,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
+  if(!offer_id) return next(new Error(error_handling_services(error_types.invalidValue,"offer id")));
+  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,"offer id")));
 
   try {
     const notice = await noticeModel.findById(notice_id).select("saler_user offers profile_photo details.brand details.category.detail_category");
-    if(!notice) return next(new Error("notice not found"));
-    if(notice.saler_user != req.decoded.id) return next(new Error("bad authorization: you cant this action"));
+    if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
+    if(notice.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"declining the offer")));
 
     const offer = notice.offers.id(offer_id);
-    if(!offer) return next(new Error("offer not found"));
-    if(offer.offer_state == offer_states.declined) return next(new Error("the offer already declined"));
+    if(!offer) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
+    if(offer.offer_state == offer_states.declined) return next(error_handling_services(error_types.logicalError,"the offer already declined"));
     offer["offer_state"] = offer_states.declined;
     await notice.save();
     const proposer = await user_model.findById(offer.proposer).select("buying_offers email");
@@ -423,7 +425,7 @@ router.post("/decline_offer", async (req, res, next)=>{
         buyerOffer = offer;
       }
     });
-    if(!buyerOffer) return next(new Error("offer not found"));
+    if(!buyerOffer) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
     buyerOffer["state"] = offer_states.declined;
     await proposer.save();
     mailServices.declinedOfferMail(proposer.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
@@ -436,7 +438,7 @@ router.post("/decline_offer", async (req, res, next)=>{
     );
     socketServices.emitNotificationOneUser(notification,proposer.id);
 
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -447,34 +449,34 @@ router.post("/send_saling_offer", async (req, res, next) => {
   const offer_id = req.body.offer_id;
   const buyer_id = req.body.buyer_id;
   const price = req.body.price;
-  if(!price) return next(new Error("price cannot be empty"));
-  if(Number.isNaN(Number.parseFloat(price))) return next(new Error("price must be an number"));
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!offer_id) return next(new Error("offer id cannot be empty"));
-  if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
-  if(!buyer_id) return next(new Error("buyer id cannot be empty"));
-  if(!isValidObjectId(buyer_id)) return next(new Error("invalid buyer id"));
+  if(!price) return next(new Error(error_handling_services(error_types.dataNotFound,"price")));
+  if(Number.isNaN(Number.parseFloat(price))) return next(error_handling_services(error_types.invalidValue,"price"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue, notice_id)));
+  if(!offer_id) return next(new Error(error_handling_services(error_types.invalidValue,"offer id")));
+  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,offer_id)));
+  if(!buyer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"buyer id")));
+  if(!isValidObjectId(buyer_id)) return next(new Error(error_handling_services(error_types.invalidValue,buyer_id)));
 
   try {
     const notice = await noticeModel.findById(notice_id).select("offers saler_user profile_photo details.brand details.category.detail_category");
-    if(!notice) return next(new Error("notice not found"));
-    if(notice.saler_user != req.decoded.id) return next(new Error("you cant sale offer for this notice"));
+    if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
+    if(notice.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"sending an sale offer")));
     const saler = await user_model.findById(req.decoded.id).select("username");
 	  const buyer = await user_model.findById(buyer_id).select("buying_offers gotten_buying_offers email");
-    if(!buyer) return next(new Error("user not found"));
+    if(!buyer) return next(new Error(error_handling_services(error_types.dataNotFound,"buyer")));
 
 
     for(let offer of buyer.gotten_buying_offers){
       if(offer.notice == notice_id){
-        return next(new Error("already sended an offer"));
+        return next(new Error(error_handling_services(error_types.logicalError,"already sended an offer")));
       }
     }
 
     for(let offer of buyer.buying_offers){
       if(offer.notice == notice_id){
         if(offer.state != offer_states.declined){
-          return next(new Error("you cannot send saling offer"));
+          return next(new Error(error_handling_services(error_types.logicalError,"already you have an not declined offer for this notice")));
         }
       }
     }
@@ -509,7 +511,7 @@ router.post("/send_saling_offer", async (req, res, next) => {
           [{item_id:notice.id, item_type: "notice"}]
         )
         socketServices.emitNotificationOneUser(notification,buyer.id);
-        return res.send(sendJsonWithTokens(req, "successfuly"));
+        return res.send(sendJsonWithTokens(req, error_types.success));
 
   } catch (error) {
     return next(error);
@@ -520,21 +522,21 @@ router.post("/send_saling_offer", async (req, res, next) => {
 router.post("/accept_offer", async (req, res, next)=>{
   const notice_id = req.body.notice_id;
   const offer_id = req.body.offer_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!offer_id) return next(new Error("offer id cannot be empty"));
-  if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
+  if(!offer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"offer id")));
+  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,offer_id)));
 
   try {
     const notice = await noticeModel.findById(notice_id).select("saler_user offers profile_photo details.brand details.category.detail_category");
-    if(!notice) return next(new Error("notice not found"));
-    if(notice.saler_user != req.decoded.id) return next(new Error("bad authorization: you cant this action"));
+    if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
+    if(notice.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"the saler of this notice is not you.")));
 
     const offer = notice.offers.id(offer_id);
-    if(!offer) return next(new Error("offer not found"));
-    if(offer.offer_state == offer_states.accepted) return next(new Error("the offer already accepted"));
-    if(offer.offer_state == offer_states.expired) return next(new Error("this offer is expired"));
-    if(offer.offer_state == offer_states.declined) return next(new Error("this offer is declined"));
+    if(!offer) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
+    if(offer.offer_state == offer_states.accepted) return next(new Error(error_handling_services(error_types.logicalError,"this offer is already accepted")));
+    if(offer.offer_state == offer_states.expired) return next(new Error(error_handling_services(error_types.logicalError,"this offer is expired")));
+    if(offer.offer_state == offer_states.declined) return next(new Error(error_handling_services(error_types.logicalError,"this offer is already declined")));
     offer["offer_state"] = offer_states.accepted;
     await notice.save();
     const proposer = await user_model.findById(offer.proposer).select("buying_offers email");
@@ -546,7 +548,7 @@ router.post("/accept_offer", async (req, res, next)=>{
       }
     });
 
-    if(!buyerOffer) return next(new Error("offer not found"));
+    if(!buyerOffer) return next(new Error(error_types.dataNotFound,"offer"));
     buyerOffer["state"] = offer_states.accepted;
     await proposer.save();
     timeoutService.deleteOffer(notice_id, proposer.id);
@@ -560,8 +562,8 @@ router.post("/accept_offer", async (req, res, next)=>{
       [{item_id: notice_id, item_type: "notice"}]
     );
 
-    socketServices.emitNotificationOneUser(notification,proposer.id);
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    socketServices.emitNotificationOneUser(notification,proposer._id);
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -570,10 +572,10 @@ router.post("/accept_offer", async (req, res, next)=>{
 router.post("/accept_saling_offer", async(req, res, next) => {
   const notice_id = req.body.notice_id;
   const offer_id = req.body.offer_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!offer_id) return next(new Error("offer id cannot be empty"));
-  if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
+  if(!offer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
+  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,offer_id)));
 
   try {
     const user = await user_model.findById(req.decoded.id).select("gotten_buying_offers username")
@@ -587,9 +589,9 @@ router.post("/accept_saling_offer", async(req, res, next) => {
     }
 
     if(!offer) return next(new Error("offer not found"));
-    if(offer.state == offer_states.accepted) return next(new Error("the offer already accepted"));
-    if(offer.state == offer_states.expired) return next(new Error("this offer is expired"));
-    if(offer.state == offer_states.declined) return next(new Error("this offer is declined"));
+    if(offer.state == offer_states.accepted) return next(new Error(error_handling_services(error_types.logicalError,"this offer is already accepted")));
+    if(offer.state == offer_states.expired) return next(new Error(error_handling_services(error_types.logicalError,"this offer is expired")));
+    if(offer.state == offer_states.declined) return next(new Error(error_handling_services(error_types.logicalError,"this offer is declined ")));
     offer["state"] = offer_states.accepted;
     await user.save();
     const notice = await noticeModel.findById(notice_id).select("saler_user profile_photo details.brand details.category.detail_category offers").populate("saler_user","email");
@@ -613,8 +615,8 @@ router.post("/accept_saling_offer", async(req, res, next) => {
       new Date(),
       [{item_id:notice.id, item_type: "notice"}]
     )
-    socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    socketServices.emitNotificationOneUser(notification,notice.saler_user._id);
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -623,10 +625,10 @@ router.post("/accept_saling_offer", async(req, res, next) => {
 router.post("/decline_saling_offer", async(req, res, next) => {
   const notice_id = req.body.notice_id;
   const offer_id = req.body.offer_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!offer_id) return next(new Error("offer id cannot be empty"));
-  if(!isValidObjectId(offer_id)) return next(new Error("invalid offer id"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
+  if(!offer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"offer id")));
+  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,offer_id)));
 
   try {
     const user = await user_model.findById(req.decoded.id).select("gotten_buying_offers username")
@@ -639,10 +641,10 @@ router.post("/decline_saling_offer", async(req, res, next) => {
       }
     }
 
-    if(!offer) return next(new Error("offer not found"));
-    if(offer.state == offer_states.accepted) return next(new Error("the offer is accepted"));
-    if(offer.state == offer_states.expired) return next(new Error("this offer is expired"));
-    if(offer.state == offer_states.declined) return next(new Error("this offer is already declined"));
+    if(!offer) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
+    if(offer.state == offer_states.accepted) return next(new Error(error_handling_services(error_types.logicalError,"this offer is already accepted")));
+    if(offer.state == offer_states.expired) return next(new Error(error_handling_services(error_types.logicalError,"this offer is expired")));
+    if(offer.state == offer_states.declined) return next(new Error(error_handling_services(error_types.logicalError,"this offer is declined")));
     offer["state"] = offer_states.declined;
     await user.save();
     const notice = await noticeModel.findById(notice_id).select("saler_user profile_photo details.brand details.category.detail_category offers").populate("saler_user","email");
@@ -665,8 +667,8 @@ router.post("/decline_saling_offer", async(req, res, next) => {
       new Date(),
       [{item_id: notice.id,item_type: "notice"}]
     )
-    socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    socketServices.emitNotificationOneUser(notification,notice.saler_user._id);
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -679,13 +681,13 @@ router.post("/send_feedback", async (req, res, next)=>{
   const feed_reason = req.body.feedback_reason;
 
   if(!Object.values(feedback_reasons).includes(feed_reason)){
-    return next(new Error("undefined feedback reason"));
+    return next(new Error(error_handling_services(error_types.invalidValue,feed_reason)));
   }
   if(!Object.values(feedback_subjects).includes(feed_subject)){
-    return next(new Error("undefined feedback subject"));
+    return next(new Error(error_handling_services(error_types.invalidValue,feed_subject)));
   }
-  if(feed_content.length> 1000 || feed_content.length ==0){
-    return next(new Error("invalid feedback content length"));
+  if(feed_content.length> 1400 || feed_content.length ==0){
+    return next(new Error(error_handling_services(error_types.invalidValue,"feedback text length must low than 1400 and mustn't equal 0")));
   }
 
   const newFeedback = new feedback_model({
@@ -698,33 +700,28 @@ router.post("/send_feedback", async (req, res, next)=>{
 
   try {
     const result = await newFeedback.save();
-    if(!result._id){
-      return next(new Error("feedback creation failed"));
-    }
-    else{
-      const savingFromUserSchema = await user_model.findByIdAndUpdate(req.decoded.id,{$addToSet: {feedbacks:  new ObjectId(result._id)}});
-      return res.send(sendJsonWithTokens(req, result));
-    }
+    const savingFromUserSchema = await user_model.findByIdAndUpdate(req.decoded.id,{$addToSet: {feedbacks:  new ObjectId(result._id)}});
+    return res.send(sendJsonWithTokens(req, error_types.success));
   } catch (error) {
     return next(error);
   }
 })
 
 router.get("/get_feedbacks", async (req, res, next)=>{
-  const result = await user_model.findById(req.decoded.id).select("feedbacks -_id").populate("feedbacks");
+  const result = await user_model.findById(req.decoded.id).select("feedbacks").populate("feedbacks");
   return res.send(sendJsonWithTokens(req,result.feedbacks));
 })
 
 router.get("/get_taken_notices", async (req, res, next)=>{
   try {
     const result = await user_model.findById(req.decoded.id).select("taken_notices");
-    console.log(result);
     return res.send(sendJsonWithTokens(req,result));
   } catch (error) {
     return next(error);
   }
 })
 
+//TODO: 
 router.post("/add_looked_notice", async (req, res, next)=>{
   const notice_id = req.body.notice_id;
   if(!notice_id) return next(new Error("notice id cannot be empty"));
@@ -745,7 +742,7 @@ router.post("/add_looked_notice", async (req, res, next)=>{
     }
 
     await noticeModel.findByIdAndUpdate(notice_id,{$inc: {displayed_count: 1}});
-    return res.send(sendJsonWithTokens(req, "successfuly"));
+    return res.send(sendJsonWithTokens(req, error_types.success));
 	  
   } catch (error) {
     return next(error);
@@ -756,8 +753,6 @@ router.post("/add_looked_notice", async (req, res, next)=>{
 router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
   const page= req.params.page;
   const refresh = req.params.refresh;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
 
   const selectItems = "favorites_count details.brand profile_photo price_details.saling_price is_featured";
   if (refresh) {
@@ -813,16 +808,16 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
 
 router.post("/stand_out", async (req, res, next)=>{
   const notice_id = req.body.notice_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
 
   try {
 	  const notice = await noticeModel.findById(notice_id).select("saler_user is_featured").populate("saler_user","own_use_trending");
     
-    if(!notice) return next(new Error("notice not found"));
-    if(notice.saler_user != req.decoded.id) return next(new Error("you cannot stand out this notice"));
-    if(notice.is_featured) return next(new Error("this notice is already standed out"));
-    if(notice.saler_user.own_use_trending === 0) return next(new Error("you have not any standing out 	justification "));
+    if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
+    if(notice.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you are not saler of this notice")));
+    if(notice.is_featured) return next(new Error(error_handling_services(error_types.logicalError,"this notice is already featured")));
+    if(notice.saler_user.own_use_trending === 0) return next(new Error(error_handling_services(error_types.logicalError,"you have not any trending justification")));
 
     await user_model.findByIdAndUpdate(req.decoded.id,{
       $inc: {own_use_trending: -1}
@@ -845,10 +840,26 @@ router.post("/stand_out", async (req, res, next)=>{
 router.get("/get_notifications", async(req, res, next)=>{
   try {
 	  const user = await user_model.findById(req.decoded.id).select("notifications");
-	  const notifications = user.notifications.sort(function(a,b){
+	  let notifications = user.notifications.sort(function(a,b){
 	    return  Date.parse(b.notification_date) - (a.notification_date); 
 	  });
-    return res.send(sendJsonWithTokens(req,{data: notifications}));
+
+    const result = [];
+    for await (let n of notifications) {
+      const items = await notification_items_getter(n.notification_items);
+      let data = {
+        Notification_title: n.Notification_title,
+        _id: n._id,
+        Notification_subtitle: n.Notification_subtitle,
+        notification_date: n.notification_date,
+        notification_category: n.notification_category,
+        is_seen: n.is_seen,
+        notification_items: items
+      };
+      result.push(data);
+    }
+
+    return res.send(sendJsonWithTokens(req,result));
   } catch (error) {
     return next(error);
   }
@@ -861,14 +872,14 @@ router.get("/get_notifications", async(req, res, next)=>{
 router.get("/get_related_accounts/:page", async (req, res, next)=>{
   try {
     const page = req.params.page;
-    if(Number.isNaN(Number.parseInt(page)) || Number.parseInt(page)<= 0) return next(new Error("invalid page number"));
+    if(Number.isNaN(Number.parseInt(page)) || Number.parseInt(page)<= 0) return next(new Error(error_handling_services(error_types.invalidValue,"page number")));
 	  const currentUser = await user_model.findById(req.decoded.id).select("most_favorite_category_for_looking");
 	  const accounts = await user_model.find({most_favorite_category_for_saling: currentUser.most_favorite_category_for_looking}).skip((page -1)*10).limit(10).select("username profile_photo ratings_count saler_score").populate({
       path: "notices",
       select: "profile_photo favorites_count details.brand price_details.saling_price",
       limit: 5
     });
-    return res.send(sendJsonWithTokens(req,{accounts: accounts}));
+    return res.send(sendJsonWithTokens(req,accounts));
   } catch (error) {
     return next(error);
   }

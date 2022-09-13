@@ -2,8 +2,6 @@ const mongoose = require('mongoose');
 const offerStates = require('../data_helper_models/offer_states');
 const addressSchema = require("./address_model");
 const notification_schema = require('./notification_schema');
-const sizes_model = require('./sizes_model');
-const soldNoticeModel = require("./sold_notice_model");
 
 const userSchema = new mongoose.Schema({
   username: {type: String, required: true}, 

@@ -17,18 +17,20 @@ const socketManager = require("../services/socket_manager");
 const socketServices = require("../services/socket_services")(socketManager.getIo());
 const notification_types = require("../model/data_helper_models/notification_types");
 const notificationModel = require("../model/data_helper_models/notification_model");
+const error_types = require("../model/api_models/error_types");
+const error_handling_services = require("../services/error_handling_services");
 
 router.post('/check_cart', async(req, res, next)=>{
   const address_id = req.body.address_id;
-  if(!address_id) return next(new Error("address id cannot be empty"));
-  if(!isValidObjectId(address_id)) return next(new Error("invalid address id"));
+  if(!address_id) return next(new Error(error_handling_services(error_types.dataNotFound,"address id")));
+  if(!isValidObjectId(address_id)) return next(new Error(error_handling_services(error_types.invalidValue,address_id)));
   try {
 	  const currentUser = await user_model.findById(req.decoded.id).select("cart addresses user_coupons username email").populate("cart.items.notice");
 
-    if(!currentUser) return next(new Error("user not found"));
+    if(!currentUser) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
     const address =currentUser.addresses.id(address_id);
-    if(!address) return next(new Error("address not found"));
-    if(currentUser.cart.items.length==0) return next(new Error("the cart is empty"));
+    if(!address) return next(new Error(error_handling_services(error_types.dataNotFound,"address")));
+    if(currentUser.cart.items.length==0) return next(new Error(error_handling_services(error_types.dataNotFound,"items")));
     const currentTime = new Date();
     for await (let saled_notice of currentUser.cart.items){
       let total_amount = 0;
@@ -134,23 +136,22 @@ router.post('/check_cart', async(req, res, next)=>{
       },
     });
 
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
-    console.log(error);
     return next(error);
   }
 })
 
 router.post("/cancel_buying", async (req, res, next)=>{
   const sold_notice_id = req.body.sold_notice_id;
-  if(!sold_notice_id) return next(new Error("sold notice id cannot be empty"));
-  if(!isValidObjectId(sold_notice_id)) return next(new Error("invalid sold notice id"));
+  if(!sold_notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"sold notice id")));
+  if(!isValidObjectId(sold_notice_id)) return next(new Error(error_handling_services(error_types.dataNotFound,sold_notice_id)));
 
   try {
     const sold_notice = await sold_notice_model.findById(sold_notice_id).populate("notice","details.category.detail_category details.brand").populate("buyer_user","username");
-    if(!sold_notice) return next(new Error("sold notice not found"));
-    if(sold_notice.buyer_user != req.decoded.id) return next(new Error("you cant cancel this saling"));
-    if(sold_notice.states[[sold_notice.states.length-1]].state_type != sold_notice_states.approved) return next(new Error("you cant cancel this saling"));
+    if(!sold_notice) return next(new Error(error_handling_services(error_types.dataNotFound,"sold notice")));
+    if(sold_notice.buyer_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you cannot cancel this sale")));
+    if(sold_notice.states[[sold_notice.states.length-1]].state_type != sold_notice_states.approved) return next(new Error(error_handling_services(error_types.logicalError,"this sale is not cancelable")));
 
     await sold_notice.updateOne({
       $addToSet: {
@@ -190,7 +191,7 @@ router.post("/cancel_buying", async (req, res, next)=>{
       [{item_id: sold_notice.id, item_type: 'sold_notice'}]
     );
     socketServices.emitNotificationOneUser(salerNotification,sold_notice.saler_user);
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -199,14 +200,14 @@ router.post("/cancel_buying", async (req, res, next)=>{
 
 router.post("/cancel_saling", async (req, res, next)=>{
   const sold_notice_id = req.body.sold_notice_id;
-  if(!sold_notice_id) return next(new Error("sold notice id cannot be empty"));
-  if(!isValidObjectId(sold_notice_id)) return next(new Error("invalid sold notice id"));
+  if(!sold_notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"sold notice id")));
+  if(!isValidObjectId(sold_notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,sold_notice_id)));
 
   try {
     const sold_notice = await sold_notice_model.findById(sold_notice_id).populate("saler_user","username").populate("notice","details.category.detail_category details.brand");
-    if(!sold_notice) return next(new Error("sold notice not found"));
-    if(sold_notice.saler_user != req.decoded.id) return next(new Error("you cant cancel this saling"));
-    if(sold_notice.states[[sold_notice.states.length-1]].state_type != sold_notice_states.approved) return next(new Error("you cant cancel this saling"));
+    if(!sold_notice) return next(new Error(error_handling_services(error_types.dataNotFound,"sold notice")));
+    if(sold_notice.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you are not saler of this notice")));
+    if(sold_notice.states[[sold_notice.states.length-1]].state_type != sold_notice_states.approved) return next(new Error(error_handling_services(error_types.logicalError,"this notice is not cancelable")));
 
     await sold_notice.updateOne({
       $addToSet: {
@@ -246,7 +247,7 @@ router.post("/cancel_saling", async (req, res, next)=>{
       [{item_id: sold_notice.id, item_type: 'sold_notice'}]
     );
     socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user);
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -255,38 +256,29 @@ router.post("/cancel_saling", async (req, res, next)=>{
 
 router.get("/get_order_info_buyer", async (req, res, next)=>{
   const sold_notice_id = req.body.sold_notice_id;
-  if(!sold_notice_id) return next(new Error("sold notice id cannot be empty"));
-  if(!isValidObjectId(sold_notice_id)) return next(new Error("invalid sold notice id"));
+  if(!sold_notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"sold notice id")));
+  if(!isValidObjectId(sold_notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,sold_notice_id)));
 
   try {
     const order = await sold_notice_model.findById(sold_notice_id).populate("notice", "details.category.detail_category details.use_case details.size profile_photo price_details.initial_price").populate("saler_user","username");
-
-    if(!order) return next(new Error("order not found"));
+    if(!order) return next(new Error(error_handling_services(error_types.dataNotFound,"order")));
     return res.send(sendJsonWithTokens(req,order));
-
   } catch (error) {
-    console.log(error);
     return next(error);
   }
-
 })
 
 router.get("/get_order_info_saler", async (req, res, next)=>{
   const sold_notice_id = req.body.sold_notice_id;
-  if(!sold_notice_id) return next(new Error("sold notice id cannot be empty"));
-  if(!isValidObjectId(sold_notice_id)) return next(new Error("invalid sold notice id"));
-
+  if(!sold_notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"sold notice id")));
+  if(!isValidObjectId(sold_notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,sold_notice_id)));
   try {
     const order = await sold_notice_model.findById(sold_notice_id).populate("notice", "details.category.detail_category details.use_case details.size profile_photo price_details.initial_price").populate("buyer_user","username");
-
-    if(!order) return next(new Error("order not found"));
+    if(!order) return next(new Error(error_handling_services(error_types.dataNotFound,"order")));
     return res.send(sendJsonWithTokens(req,order));
-
   } catch (error) {
-    console.log(error);
     return next(error);
   }
-
-})
+});
 
 module.exports = router;

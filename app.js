@@ -12,7 +12,7 @@ socketManager.initializeIo(server);
 const socket_services = require("./services/socket_services")(socketManager.getIo());
 
 // routes
-const  errorsMiddleware  = require('./controllers/error_handler_controller');
+const  errorsMiddleware  = require('./controllers/error_handler_middleware');
 const authenticationRoutes = require("./routes/authentication_routes");
 const accountRoutes = require("./routes/account_routes");
 const noticeRoutes = require("./routes/notice_routes");
@@ -21,6 +21,8 @@ const docsRoutes = require("./routes/docs_routes");
 const saleRoutes = require("./routes/sale_routes");
 const searchRoutes = require("./routes/search_routes");
 const notificationModel = require('./model/data_helper_models/notification_model');
+const error_types = require('./model/api_models/error_types');
+const error_handling_services = require('./services/error_handling_services');
 
 //middlewares
 app.use(express.urlencoded({extended:false}));

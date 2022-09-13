@@ -9,6 +9,8 @@ const userModel = require('../model/mongoose_models/user_model');
 const crypto= require("crypto");
 const emailService = require('../services/mail_services');
 const { sendJsonWithTokens } = require('../services/response_sendjson');
+const error_types = require('../model/api_models/error_types');
+const error_handling_services = require('../services/error_handling_services');
 
 router.post("/signup",validators.isEmail, validators.isPasswordPowerless,validators.isUsernameValid,validators.isPhoneNumberValid, controllers.signupController);
 router.post("/login_with_username", validators.isUsernameValid, controllers.loginController);
@@ -26,10 +28,10 @@ router.post("/send_validation_mail",jwtService.validateJwt, async (req,res,next)
       });
 
       emailService.emailValidationMail(user.email, user.username,"http://localhost:3000");
-      return res.send(sendJsonWithTokens(req,"successfuly"));
+      return res.send(sendJsonWithTokens(req,error_types.success));
     }
     else{
-      return next(new Error("the email already validated."));
+      return next(new Error(error_handling_services(error_types.logicalError,"this mail address is already validated")));
     }
   } catch (error) {
     return next(error);
@@ -39,9 +41,9 @@ router.post("/validate_mail/:hashed_route",jwtService.validateJwt, async (req, r
   const hash = req.params.hashed_route;
   try {
     const user = await userModel.findById(req.decoded.id).select("email_validation_hashed_route is_validated_with_email");
-    if(!user) return next(new Error("user not found"));
+    if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
     if(hash != user.email_validation_hashed_route){
-      return next(new Error("email validation process failed."));
+      return next(new Error(error_handling_services(error_types.logicalError,"wrong action")));
     }
     else{
       await user.updateOne({
@@ -49,7 +51,7 @@ router.post("/validate_mail/:hashed_route",jwtService.validateJwt, async (req, r
           is_validated_with_email: true
         }
       });
-      return res.send(sendJsonWithTokens(req,"successfuly"));
+      return res.send(sendJsonWithTokens(req,error_types.success));
     }
   } catch (error) {
     return next(error);

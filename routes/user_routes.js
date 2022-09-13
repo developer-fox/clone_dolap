@@ -15,14 +15,16 @@ const socketManager = require("../services/socket_manager");
 const socketServices = require("../services/socket_services")(socketManager.getIo());
 const notification_types = require("../model/data_helper_models/notification_types");
 const notificationModel = require("../model/data_helper_models/notification_model");
+const error_types = require('../model/api_models/error_types');
+const error_handling_services = require('../services/error_handling_services');
 
 router.get("/get_user_info", async (req, res, next) =>{
   const user_id = req.body.user_id;
-  if(!user_id) return next(new Error("user id cannot be empty"));
-  if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
+  if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));
+  if(!mongoose.isValidObjectId(user_id)) return next(new Error(error_handling_services(error_types.invalidValue,user_id)));
   try {
 	  const user = await userModel.findById(user_id).select("username profile_description profile_photo last_seen is_validated saler_score followers_count follows_count sold_notices_count favorites_count is_credible_saler average_send_time notices_count ratings_count");
-	  if(!user) return next(new Error("user not found"));
+	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
 	  return res.send(sendJsonWithTokens(req, user));
   } catch (error) {
     return next(error);
@@ -34,24 +36,24 @@ router.get("/get_user_notices/:page", async (req, res, next)=>{
   const user_id= req.body.user_id;
   const filters = req.body.filters;
   const sorting = req.body.sort;
-  if(!user_id) return next(new Error("user id cannot be empty"));
-  if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
-  if(Number.isNaN(page)) return next(new Error("page information must be integer"));
+  if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));
+  if(!mongoose.isValidObjectId(user_id)) return next(new Error(error_handling_services(error_types.invalidValue,user_id)));
+  if(Number.isNaN(page)) return next(new Error(error_handling_services(error_types.invalidValue,page)));
   const noticesCount = await userModel.findById(user_id).select("notices_count");
   const pagesCount = Math.ceil(noticesCount.notices_count / 10);  
-  if(page <= 0) return next(new Error("invalid page number"));
-  if(pagesCount> 0 && page> pagesCount ) return next(new Error("invalid page number"));
+  if(page <= 0) return next(new Error(error_handling_services(error_types.invalidValue,page)));
+  if(pagesCount> 0 && page> pagesCount ) return next(new Error(error_handling_services(error_types.invalidValue,page)));
 
   if(filters){
     Object.keys(filters).forEach(key=>{
       if(!notice_get_filters.includes(key)){
-        return next(new Error("undefined filter parameter"));
+        return next(new Error(error_handling_services(error_types.invalidValue,key)));
       }
     })
   }
 
   if(sorting && !Object.values(notice_get_sorting_parameters).includes(sorting)){
-    return next(new Error("undefined sorting parameter"));
+    return next(new Error(error_handling_services(error_types.invalidValue,sorting)));
   }
 
   try {
@@ -68,7 +70,6 @@ router.get("/get_user_notices/:page", async (req, res, next)=>{
     if(sorting){
       result = sortingService(result,sorting)
     }
-
 
     return res.send(sendJsonWithTokens(req, {
 	    notices: result.slice((page-1)*10, (page*10)),
@@ -87,29 +88,29 @@ router.post("/add_rating", async(req, res, next) => {
   const validity_rate = req.body.validity_rate;
   const packing_rate = req.body.packing_rate;
 
-  if(!sold_notice_id) return next(new Error("notice id cannot be empty"));
-  if(!mongoose.isValidObjectId(sold_notice_id)) return next(new Error("invalid notice id"));
-  if(!user_id) return next(new Error("user id cannot be empty"));
-  if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
+  if(!sold_notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"sold notice id")));
+  if(!mongoose.isValidObjectId(sold_notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,sold_notice_id)));
+  if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));
+  if(!mongoose.isValidObjectId(user_id)) return next(new Error(error_handling_services(error_types.invalidValue,user_id)));
   if(content) content = content.trim();
 
-  if(Number.isNaN(Number.parseFloat(communication_rate))) return next(new Error("communication rate must be integer"));
-  if(Number.isNaN(Number.parseFloat(validity_rate))) return next(new Error("validity rate must be integer"));
-  if(Number.isNaN(Number.parseFloat(packing_rate))) return next(new Error("packing rate must be integer"));
+  if(Number.isNaN(Number.parseFloat(communication_rate))) return next(new Error(error_handling_services(error_types.invalidValue,communication_rate)));
+  if(Number.isNaN(Number.parseFloat())) return next(new Error(error_handling_services(error_types.invalidValue,validity_rate)));
+  if(Number.isNaN(Number.parseFloat(packing_rate))) return next(new Error(error_handling_services(error_types.invalidValue,packing_rate)));
 
-  if(communication_rate<0 ||communication_rate> 5) return next(new Error("invalid rate value"));
-  if(validity_rate<0 ||validity_rate> 5) return next(new Error("invalid rate value"));
-  if(packing_rate<0 ||packing_rate> 5) return next(new Error("invalid rate value"));
+  if(communication_rate<0 ||communication_rate> 5) return next(new Error(error_handling_services(error_types.invalidValue,communication_rate)));
+  if(validity_rate<0 ||validity_rate> 5) return next(new Error(error_handling_services(error_types.invalidValue,validity_rate)));
+  if(packing_rate<0 ||packing_rate> 5) return next(new Error(error_handling_services(error_types.invalidValue,packing_rate)));
 
   try {
     const rater_user = await userModel.findById(req.decoded.id).select("username");
     let total_rating = (communication_rate + validity_rate + packing_rate)/3;
     const notice = await soldNoticesModel.findById(sold_notice_id).select("notice saler_user buyer_user payment_total.amount").populate("notice","profile_photo title");
-    if(!notice) return next(new Error("notice not found"));
+    if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
     const user = await userModel.findById(user_id).select("username profile_photo saler_score ratings");
-    if(!user) return next(new Error("user not found"));
-    if(notice.saler_user != user._id) return next(new Error("wrong saler information"));
-    if(notice.buyer_user != req.decoded.id) return next(new Error("wrong buyer user"));
+    if(!user) return next(new Error(error_handling_services(error_types.dateNotFound,"user")));
+    if(notice.saler_user != user._id) return next(new Error(error_handling_services(error_types.invalidValue,"saler user")));
+    if(notice.buyer_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you cannot rate this notice")));
 
     const result = await user.updateOne({
       $addToSet: {ratings: {
@@ -137,7 +138,7 @@ router.post("/add_rating", async(req, res, next) => {
       {item_id: notice.id, item_type:"sold_notice"}]
     );
     socketServices.emitNotificationOneUser(notification, user_id);
-    return res.send(sendJsonWithTokens(req,processMessage));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -146,15 +147,15 @@ router.post("/add_rating", async(req, res, next) => {
 router.post("/answer_the_rating", async (req, res, next) =>{
   const rating_id = req.body.rating_id;
   const content = req.body.content;
-  if(!rating_id) return next(new Error("rating id cannot be empty"));
-  if(!mongoose.isValidObjectId(rating_id)) return next(new Error("invalid rating id"));
-  if(!content || content.length<1) return next(new Error("content cannot be empty/null"));
+  if(!rating_id) return next(new Error(error_handling_services(error_types.dataNotFound,"rating id")));
+  if(!mongoose.isValidObjectId(rating_id)) return next(new Error(error_handling_services(error_types.invalidValue,rating_id)));
+  if(!content || content.length<1) return next(new Error(error_handling_services(error_types.dataNotFound,"content")));
   try {
 	  const ratings = await userModel.findById(req.decoded.id).select("ratings username");
     const currentUser = ratings;
 	  const rating = ratings.ratings.id(rating_id);
-    if(!rating) return next(new Error("rating not found"));
-    if(rating.saler_answer) return next(new Error("you cant add a new answer"));
+    if(!rating) return next(new Error(error_handling_services(error_types.dataNotFound,"rating")));
+    if(rating.saler_answer) return next(new Error(error_handling_services(error_types.logicalError,"you already answered this rating")));
 
     rating.saler_answer = content;
     await ratings.save();
@@ -167,7 +168,7 @@ router.post("/answer_the_rating", async (req, res, next) =>{
       {item_id: rating.rating_notice, item_type: "sold_notice"}]
     );
     socketServices.emitNotificationOneUser(notification, rating.rater_user);
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
 	
   } catch (error) {
     return next(error);
@@ -179,11 +180,11 @@ router.get("/get_user_ratings/:page", async (req, res, next)=>{
   const user_id = req.body.user_id;
   const page = req.params.page;
 
-  if(!user_id) return next(new Error("user id cannot be empty"));
-  if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
-  if(Number.isNaN(Number.parseFloat(page))) return next(new Error("page parameter must be a number"));
+  if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));
+  if(!mongoose.isValidObjectId(user_id)) return next(new Error(error_handling_services(error_types.invalidValue,user_id)));
+  if(Number.isNaN(Number.parseFloat(page))) return next(new Error(error_handling_services(error_types.invalidValue,page)));
 
-  if(page <= 0) return next(new Error("invalid page number"));
+  if(page <= 0) return next(new Error(error_handling_services(error_types.invalidValue,page)));
 
   const ratings = await userModel.findById(user_id).select("ratings _id").populate("ratings.rating_notice","profile_photo title price_details.saling_price");
 
@@ -192,24 +193,19 @@ router.get("/get_user_ratings/:page", async (req, res, next)=>{
     return rating; 
   });
 
-  const pagesCount = Math.ceil(result.length / 15);  
-
   return res.send(sendJsonWithTokens(req,{
     ratings: result.slice((page-1)*15, (page*15)),
-    page_count: pagesCount
   }));
 
 })
 
 router.post("/follow_user", async (req, res, next)=>{
   let user_id = req.body.user_id;
-  if(!user_id) return next(new Error("user id cannot be empty"));
-  if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
+  if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));
+  if(!mongoose.isValidObjectId(user_id)) return next(new Error(error_handling_services(error_types.invalidValue,user_id)));
   try {
-	
 	  const currentUser = await userModel.findById(req.decoded.id).select("follows follows_count username");
-	  if(!currentUser) return next(new Error("an error detected"));
-    if(currentUser.follows.includes(user_id)) return next(new Error("you already following this user "));
+    if(currentUser.follows.includes(user_id)) return next(new Error(error_handling_services(error_types.logicalError,"you already following this user")));
     await currentUser.updateOne({$addToSet: {follows: user_id}, $inc: {follows_count: 1}});
     
     const notification = new notificationModel(
@@ -221,53 +217,42 @@ router.post("/follow_user", async (req, res, next)=>{
     );
 
     socketServices.emitNotificationOneUser(notification, user_id);
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
-
 })
 
 router.post("/unfollow_user", async (req, res, next)=>{
   let user_id = req.body.user_id;
-  if(!user_id) return next(new Error("user id cannot be empty"));
-  if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
+  if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));
+  if(!mongoose.isValidObjectId(user_id)) return next(new Error(error_handling_services(error_types.invalidValue,user_id)));
   try {
-	
 	  const currentUserFollowsList = await userModel.findById(req.decoded.id).select("follows follows_count");
-	  if(!currentUserFollowsList) return next(new Error("an error detected"));
-    if(!currentUserFollowsList.follows.includes(user_id)) return next(new Error("you already not follow this user"));
-  
+    if(!currentUserFollowsList.follows.includes(user_id)) return next(new Error(error_handling_services(error_types.logicalError,"you already not following this user")));  
     await currentUserFollowsList.updateOne({$pull: {follows: user_id}, $inc: {follows_count: -1}});
-
-    return res.send(sendJsonWithTokens(req,"successfuly"));
-
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
-
 })
 
 router.get("/get_follows", async (req, res, next)=>{
   try {
     const result = await userModel.findById(req.decoded.id).select("follows").populate("follows", "profile_photo notices_count sold_notices_count username");
-    if(!result) return next(new Error("an error detected when data getting"));
     return res.send(sendJsonWithTokens(req,result.follows));
   } catch (error) {
     return next(error);
   }
-
 })
 
 router.get("/get_followers", async (req, res, next)=>{
   try {
     const result = await userModel.findById(req.decoded.id).select("followers").populate("followers", "profile_photo notices_count sold_notices_count username");
-    if(!result) return next(new Error("an error detected when data getting"));
     return res.send(sendJsonWithTokens(req,result.followers));
   } catch (error) {
     return next(error);
   }
-
 })
 
 router.post("/report_user", async (req, res, next)=>{
@@ -275,11 +260,10 @@ router.post("/report_user", async (req, res, next)=>{
   const content = req.body.content;
   const user_id = req.body.user_id;
 
-  if(!user_id) return next(new Error("user id cannot be empty"));
-  if(!mongoose.isValidObjectId(user_id)) return next(new Error("invalid user id"));
-  if(!content) return next(new Error("content cannot be empty"));
-  if(!reason || !user_report_reasons.includes(reason)) return next(new Error("invalid report reason"));
-  
+  if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));
+  if(!mongoose.isValidObjectId(user_id)) return next(new Error(error_handling_services(error_types.invalidValue,user_id)));
+  if(!content) return next(new Error(error_handling_services(error_types.dataNotFound,"content")));
+  if(!reason || !user_report_reasons.includes(reason)) return next(new Error(error_handling_services(error_types.invalidValue,reason)));
   try {
     const newReport = new user_report_model({
       date: new Date(),
@@ -288,15 +272,11 @@ router.post("/report_user", async (req, res, next)=>{
       reporter_user: req.decoded.id,
       reason: reason
     })
-
     const result = await newReport.save();
-    if(!result._id) return next(new Error("error detected when report sending"));
-    return res.send(sendJsonWithTokens(req,"successfuly"));
-
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
-
 })
 
 module.exports= router;

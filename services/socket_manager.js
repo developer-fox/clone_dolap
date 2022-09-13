@@ -4,7 +4,6 @@ const http = require("http");
 const ms = require("ms");
 const jsonwebtoken = require("jsonwebtoken");
 const jwtService = require("./jwt_services");
-const error_messages = require("../model/api_models/error_messages");
 const socketModel = require("../model/mongoose_models/socket_model");
 
 let io;
@@ -43,7 +42,7 @@ module.exports.initializeIo = (server)=>{
           socket.decoded = jwtValid;
           next();
         } catch (error) {
-          if(error.message == error_messages.expiredJwtToken){
+          if(error.message == "jwt expired"){
             try {
               const new_jwt = await jwtService.createNewJwtTokenWithRefreshToken(auth.jwt_refresh);
               socket.jwt = new_jwt;
@@ -51,7 +50,7 @@ module.exports.initializeIo = (server)=>{
               socket.decoded = await jsonwebtoken.decode(new_jwt);
               next();
             } catch (error) {
-              if(error.message == error_messages.expiredJwtToken){
+              if(error.message == "jwt expired"){
                 next(new Error("refresh token expired"));
               }
               else{

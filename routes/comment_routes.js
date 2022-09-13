@@ -16,26 +16,28 @@ const socketManager = require("../services/socket_manager");
 const socketServices = require("../services/socket_services")(socketManager.getIo());
 const notification_types = require("../model/data_helper_models/notification_types");
 const notificationModel = require("../model/data_helper_models/notification_model");
+const error_handling_services = require('../services/error_handling_services');
+const error_types = require('../model/api_models/error_types');
 
 router.post("/add_comment",  async (req, res, next)=>{
 
   const notice_id = req.body.notice_id;
   const content = req.body.content;
 
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
 
   if(!isValidObjectId(notice_id)){
-    return next(new Error("invalid notice id data"));
+    return next(new Error(error_handling_services(error_types.invalidValue,"notice id")));
   }
 
   if(!content || content.length<1){
-    return next(new Error("content cannot be empty"));
+    return next(new Error(error_handling_services(error_types.invalidValue,"content")));
   }
   
   try {
 	  const notice = await noticeModel.findById(notice_id).select("details price_details notice_questions").populate("saler_user","email");
     if(!notice._id){
-      return next(new Error("notice not found"));
+      return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
     }
     notice.notice_questions.push({
 	    question: {
@@ -59,7 +61,7 @@ router.post("/add_comment",  async (req, res, next)=>{
     );
     socketServices.emitNotificationOneUser(notification,notice.saler_user.id);
 
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -71,17 +73,17 @@ router.post("/add_answer",  async (req, res, next)=>{
   const comment_id = req.body.comment_id;
   const content = req.body.content;
 
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!comment_id) return next(new Error("comment id cannot be empty"));
-  if(!isValidObjectId(comment_id)) return next(new Error("invalid comment id"));
-  if(!content || content.length<1) return next(new Error("content cannot be empty"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,"notice id")));
+  if(!comment_id) return next(new Error(error_handling_services(error_types.dataNotFound,"comment id")));
+  if(!isValidObjectId(comment_id)) return next(new Error(error_handling_services(error_types.invalidValue,"comment id")));
+  if(!content || content.length<1) return next(new Error(error_handling_services(error_types.dataNotFound,"content")));
 
   try {
 	  const notice = await noticeModel.findById(notice_id).populate();
-	  if(!notice) return next(new Error("notice not found"));
+	  if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
 	  const comment = notice.notice_questions.id(comment_id);
-	  if(!comment) return next(new Error("comment not found"));
+	  if(!comment) return next(new Error(error_handling_services(error_types.dataNotFound,"comment")));
 	  comment.answers.push( { 
 	    date: new Date(),
 	    user: req.decoded.id,
@@ -90,8 +92,8 @@ router.post("/add_answer",  async (req, res, next)=>{
 	  await notice.save();
     const user = await user_model.findById(req.decoded.id).select("username");
     const commenter_user = await user_model.findById(comment.question.user).select("email");
-    if(!commenter_user) return next(new Error("user not found"));
-    if(!user) return next(new Error("user not found"));
+    if(!commenter_user) return next(new Error(error_handling_services(error_types.dataNotFound,"commenter user")));
+    if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
     mailServices.newAnswerMail(commenter_user.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/pug");
 
     const notification = new notificationModel(
@@ -102,7 +104,7 @@ router.post("/add_answer",  async (req, res, next)=>{
       [{item_id:user.id, item_type:"user"}, {item_id:notice.id, item_type:"notice"}],
     );
     socketServices.emitNotificationOneUser(notification,commenter_user.id);
-	  return res.send(sendJsonWithTokens(req,"successfuly"));
+	  return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -111,12 +113,12 @@ router.post("/add_answer",  async (req, res, next)=>{
 router.get("/get_comments", async (req, res, next)=>{
   const notice_id = req.body.notice_id;
 
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,"notice id")));
 
   try {
-    const comments = await noticeModel.findById(notice_id).select("notice_questions -_id");
-    if(!comments) return next(new Error("invalid comments taken"));
+    const comments = await noticeModel.findById(notice_id).select("notice_questions");
+    if(!comments) return next(new Error(error_handling_services(error_types.dataNotFound,"comments")));
     return res.send(sendJsonWithTokens(req, comments));
   } catch (error) {
     return next(error);
@@ -127,19 +129,19 @@ router.get("/get_comments", async (req, res, next)=>{
 router.delete("/delete_comment",  async (req, res, next)=>{
   const notice_id = req.body.notice_id;
   const comment_id = req.body.comment_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!comment_id) return next(new Error("comment id cannot be empty"));
-  if(!isValidObjectId(comment_id)) return next(new Error("invalid comment id"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,"notice id")));
+  if(!comment_id) return next(new Error(error_handling_services(error_types.dataNotFound,"comment id")));
+  if(!isValidObjectId(comment_id)) return next(new Error(error_handling_services(error_types.invalidValue,"comment id")));
 
   try {
     const notice = await noticeModel.findById(notice_id).select("notice_questions");
     const comment = notice.notice_questions.id(comment_id);
-    if(comment.question.user != req.decoded.id) return next(new Error("authorization fail"));
+    if(comment.question.user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you cannot delete this comment")));
     const result = await noticeModel.findByIdAndUpdate(notice_id, {$pull: {
       notice_questions: {"_id": comment_id},
     }});
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
@@ -149,12 +151,12 @@ router.delete("/delete_answer", async (req, res, next)=>{
   const notice_id = req.body.notice_id;
   const comment_id = req.body.comment_id;
   const answer_id = req.body.answer_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-  if(!comment_id) return next(new Error("comment id cannot be empty"));
-  if(!isValidObjectId(comment_id)) return next(new Error("invalid comment id"));
-  if(!answer_id) return next(new Error("answer id cannot be empty"));
-  if(!isValidObjectId(answer_id)) return next(new Error("invalid answer id"));
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,"notice id")));
+  if(!comment_id) return next(new Error(error_handling_services(error_types.dataNotFound,"comment id")));
+  if(!isValidObjectId(comment_id)) return next(new Error(error_handling_services(error_types.invalidValue,"comment id")));
+  if(!answer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"answer id")));
+  if(!isValidObjectId(answer_id)) return next(new Error(error_handling_services(error_types.invalidValue,"answer id")));
 
   try {
 	  const notice = await noticeModel.findById(notice_id).select("notice_questions");
@@ -164,11 +166,10 @@ router.delete("/delete_answer", async (req, res, next)=>{
     if(answer.user != req.decoded.id) return next(new Error("authorization fail"));
     answer.remove();
     await notice.save();
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }
-
 
 })
 
