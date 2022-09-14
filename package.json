@@ -5,9 +5,10 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon run app.js"
+    "prestart": "nodemon run app.js",
+    "start": "node app.js"
   },
-  "author": "",
+  "author": "developer-fox",
   "license": "ISC",
   "dependencies": {
     "bcrypt": "^5.0.1",
@@ -36,5 +37,12 @@
   },
   "devDependencies": {
     "nodemon": "^2.0.19"
+  },
+  "keywords": [
+    "example",
+    "heroku"
+  ],
+  "engines": {
+    "node": "16.x"
   }
 }

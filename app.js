@@ -46,10 +46,6 @@ app.use("/user", jwtService.validateJwt, userRoutes);
 app.use("/sale", jwtService.validateJwt, saleRoutes);
 app.use("/search", jwtService.validateJwt, searchRoutes);
 
-app.use("/render", (req, res, next)=>{
-  return res.render("validate_email.pug");
-
-})
 
 app.use(errorsMiddleware);
 
