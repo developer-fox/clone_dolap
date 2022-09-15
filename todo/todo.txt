@@ -2,6 +2,5 @@
 * deep linking
 * editing route positions
 * update file actions
-* update add to cart route
 * websocket jwt actions writing 
 * adding security solutions

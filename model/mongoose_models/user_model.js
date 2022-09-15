@@ -133,6 +133,7 @@ const userSchema = new mongoose.Schema({
   user_looked_notices: {
     type: [mongoose.SchemaTypes.ObjectId],
     default: [],
+    ref: "notice"
   },
   homepage_notices: {type: [mongoose.SchemaTypes.ObjectId], ref:"notice"},
   cart: {

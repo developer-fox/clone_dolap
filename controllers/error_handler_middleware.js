@@ -9,7 +9,8 @@ module.exports = function (error,req, res, next) {
       return res.status(statusCode).send(error.message);
     }
   }
-  return res.status(449).send(error.message);
+  console.log(error);
+  return res.status(449).send("an error occurred: ");
 }
 
 function statusCodesLiteral(error_message){

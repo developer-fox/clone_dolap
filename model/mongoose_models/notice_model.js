@@ -85,7 +85,15 @@ const noticeShema = new mongoose.Schema({
     displayed_count : {type: Number, default: 0},
     is_featured: {type: Boolean, default: false},
     feature_expire_time: {type: Date, default:new Date(1995, 11, 17, 3, 24, 0)},
-    stars: {type: Number, default: 0}
+    stars: {type: Number, default: 0},
+    accepted_offers: [{
+      type: {
+        proposer: {type: mongoose.SchemaTypes.ObjectId, required: true, ref: "user"},
+        amount: {type: Number, required: true},
+        offer_id:  {type: mongoose.SchemaTypes.ObjectId, required: true},
+      },
+      default: [],
+    }],
 });
 
 module.exports = mongoose.model("notice", noticeShema, "notices");

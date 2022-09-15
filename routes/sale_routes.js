@@ -16,7 +16,7 @@ const timeoutService = require("../services/timeout_services");
 const socketManager = require("../services/socket_manager");
 const socketServices = require("../services/socket_services")(socketManager.getIo());
 const notification_types = require("../model/data_helper_models/notification_types");
-const notificationModel = require("../model/data_helper_models/notification_model");
+const notificationModel = require("../model/api_models/notification_model");
 const error_types = require("../model/api_models/error_types");
 const error_handling_services = require("../services/error_handling_services");
 
@@ -36,6 +36,8 @@ router.post('/check_cart', async(req, res, next)=>{
       let total_amount = 0;
       const currentNotice = saled_notice.notice;
       const currentSaler = await user_model.findById(currentNotice.saler_user).select("username email sold_notices_count");
+      let main_amount = saled_notice.total_price;
+
       const payment_details = [
         {
           payment_amount: saled_notice.total_price,
@@ -261,6 +263,8 @@ router.get("/get_order_info_buyer", async (req, res, next)=>{
 
   try {
     const order = await sold_notice_model.findById(sold_notice_id).populate("notice", "details.category.detail_category details.use_case details.size profile_photo price_details.initial_price").populate("saler_user","username");
+    if(order.buyer_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you are not buyer of this order")));
+
     if(!order) return next(new Error(error_handling_services(error_types.dataNotFound,"order")));
     return res.send(sendJsonWithTokens(req,order));
   } catch (error) {
@@ -274,6 +278,7 @@ router.get("/get_order_info_saler", async (req, res, next)=>{
   if(!isValidObjectId(sold_notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,sold_notice_id)));
   try {
     const order = await sold_notice_model.findById(sold_notice_id).populate("notice", "details.category.detail_category details.use_case details.size profile_photo price_details.initial_price").populate("buyer_user","username");
+    if(order.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you are not saler of this order")));
     if(!order) return next(new Error(error_handling_services(error_types.dataNotFound,"order")));
     return res.send(sendJsonWithTokens(req,order));
   } catch (error) {

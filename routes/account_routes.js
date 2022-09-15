@@ -25,7 +25,7 @@ const socketManager = require("../services/socket_manager")
 const socketServices = require("../services/socket_services")(socketManager.getIo());
 const socket_model = require("../model/mongoose_models/socket_model");
 const notification_schema = require("../model/mongoose_models/notification_schema");
-const notificationModel = require("../model/data_helper_models/notification_model");
+const notificationModel = require("../model/api_models/notification_model");
 const notification_types = require("../model/data_helper_models/notification_types");
 const notification_items_getter = require("../controllers/notification_items_getter");
 const error_handling_services = require("../services/error_handling_services");
@@ -190,7 +190,6 @@ router.get("/get_favorites/:page", async (req, res, next)=>{
   }  
 })
 
-//TODO: add notification
 router.post("/add_to_favorites", async (req, res, next)=>{
   let idToBeAdded = req.body.new_favorite_notice_ids;
   if(!idToBeAdded || idToBeAdded.length === 0) {
@@ -200,23 +199,34 @@ router.post("/add_to_favorites", async (req, res, next)=>{
   const user = await user_model.findById(req.decoded.id).select("favorites");
   if(!user) return next(new Error("user not found"));
   
-  for(id of idToBeAdded) {
+  for await(let id of idToBeAdded) {
     if(!mongoose.isValidObjectId(id)){
       return next(new Error(new Error(error_handling_services(error_types.invalidValue,id))));
     }
     if(user.favorites.includes(id)){
       return next(new Error(error_handling_services(error_types.logicalError,"this notice already in favorites list of user")));
-    } 
-  }
+    }
+    const currentUser = await user_model.findById(req.decoded.id).select("username");
+    const noticeWithSaler = await notice_model.findById(id).select("saler_user details.brand details.category details_category");
+    const notification = new notificationModel(
+      "Bir ürünün beğenildi!",
+      `@${currentUser.username} ${noticeWithSaler.details.brand} marka ${noticeWithSaler.details.category.detail_category} ürününü beğendi!`,
+      notification_types.noticeLiked,
+      new Date(),
+      [{item_id: id, item_type: "notice"},{item_id: req.decoded.id, item_type: "user"}]
+    );
 
-  idToBeAdded.forEach(async(item)=>{
-    await notice_model.findByIdAndUpdate(item, {
+    socketServices.emitNotificationOneUser(notification, noticeWithSaler._id);
+
+    await notice_model.findByIdAndUpdate(id, {
       $addToSet: {
         favorited_users: req.decoded.id
       },
       $inc: {favorites_count: 1}
     });
-  });
+
+  }
+
   try {
 	  await user_model.findByIdAndUpdate(req.decoded.id, {$push: {favorites: idToBeAdded}, $inc: {favorites_count: idToBeAdded.length}});
     return res.send(sendJsonWithTokens(req, error_types.success));
@@ -374,344 +384,6 @@ router.get("/get_sizes_spesific/:top_size/:medium_size", async (req, res, next)=
 
 })
 
-router.get("/get_saling_offers", async (req, res, next)=>{
-  try {
-    const datas = await user_model.findById(req.decoded.id).select("notices").populate("notices","_id offers");
-
-    let offers = [];
-    datas.notices.forEach((item) => {
-      offers.push(...item.offers);
-    });
-
-    return res.send(sendJsonWithTokens(req,offers));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.get("/get_buying_offers", async (req, res, next)=>{
-  try {
-    const datas = await user_model.findById(req.decoded.id).select("buying_offers");
-    return res.send(sendJsonWithTokens(req,datas));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.post("/decline_offer", async (req, res, next)=>{
-  const notice_id = req.body.notice_id;
-  const offer_id = req.body.offer_id;
-  if(!notice_id) return next(new Error(error_handling_services(error_types.invalidValue,"notice id")));
-  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
-  if(!offer_id) return next(new Error(error_handling_services(error_types.invalidValue,"offer id")));
-  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,"offer id")));
-
-  try {
-    const notice = await noticeModel.findById(notice_id).select("saler_user offers profile_photo details.brand details.category.detail_category");
-    if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
-    if(notice.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"declining the offer")));
-
-    const offer = notice.offers.id(offer_id);
-    if(!offer) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
-    if(offer.offer_state == offer_states.declined) return next(error_handling_services(error_types.logicalError,"the offer already declined"));
-    offer["offer_state"] = offer_states.declined;
-    await notice.save();
-    const proposer = await user_model.findById(offer.proposer).select("buying_offers email");
-    const user = await user_model.findById(req.decoded.id).select("username");
-
-    let buyerOffer;
-    proposer.buying_offers.forEach((offer) => {
-      if(offer.notice == notice_id.toString()) {
-        buyerOffer = offer;
-      }
-    });
-    if(!buyerOffer) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
-    buyerOffer["state"] = offer_states.declined;
-    await proposer.save();
-    mailServices.declinedOfferMail(proposer.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
-    const notification = new notificationModel(
-      "Teklifin reddedildi",
-      `@${user.username} ${notice.details.category.detail_category} kategorisindeki ${notice.details.brand} marka ürüne verdiğin ${buyerOffer.price} TL'lik teklifi reddetti`,
-      notification_types.offer,
-      new Date(),
-      [{item_id: notice.id, item_type:"notice"}]
-    );
-    socketServices.emitNotificationOneUser(notification,proposer.id);
-
-    return res.send(sendJsonWithTokens(req,error_types.success));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.post("/send_saling_offer", async (req, res, next) => {
-  const notice_id = req.body.notice_id;
-  const offer_id = req.body.offer_id;
-  const buyer_id = req.body.buyer_id;
-  const price = req.body.price;
-  if(!price) return next(new Error(error_handling_services(error_types.dataNotFound,"price")));
-  if(Number.isNaN(Number.parseFloat(price))) return next(error_handling_services(error_types.invalidValue,"price"));
-  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
-  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue, notice_id)));
-  if(!offer_id) return next(new Error(error_handling_services(error_types.invalidValue,"offer id")));
-  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,offer_id)));
-  if(!buyer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"buyer id")));
-  if(!isValidObjectId(buyer_id)) return next(new Error(error_handling_services(error_types.invalidValue,buyer_id)));
-
-  try {
-    const notice = await noticeModel.findById(notice_id).select("offers saler_user profile_photo details.brand details.category.detail_category");
-    if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
-    if(notice.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"sending an sale offer")));
-    const saler = await user_model.findById(req.decoded.id).select("username");
-	  const buyer = await user_model.findById(buyer_id).select("buying_offers gotten_buying_offers email");
-    if(!buyer) return next(new Error(error_handling_services(error_types.dataNotFound,"buyer")));
-
-
-    for(let offer of buyer.gotten_buying_offers){
-      if(offer.notice == notice_id){
-        return next(new Error(error_handling_services(error_types.logicalError,"already sended an offer")));
-      }
-    }
-
-    for(let offer of buyer.buying_offers){
-      if(offer.notice == notice_id){
-        if(offer.state != offer_states.declined){
-          return next(new Error(error_handling_services(error_types.logicalError,"already you have an not declined offer for this notice")));
-        }
-      }
-    }
-
-        await buyer.updateOne({
-          $addToSet: {
-            gotten_buying_offers: {
-              remaining_time: new Date(new Date().setDate(new Date().getDate() +1)),
-              price: price,
-              notice: notice_id,
-            }
-          }
-        });
-        await notice.updateOne({
-          $addToSet: {
-            offers: {
-              proposer: buyer.id,
-              remaining_time: new Date(new Date().setDate(new Date().getDate() +1)),
-              offer_price: price,
-              offer_type: "sale",
-            }
-          }
-        })
-        timeoutService.deleteOffer(notice_id,req.decoded.id, buyer_id);
-        mailServices.newSalingOffer(buyer.email, saler.username, notice.profile_photo, notice.details.brand, price, notice.details.category.detail_category, "http://localhost:3200/render");
-
-        const notification = new notificationModel(
-          `Yeni bir satış teklifin var!`,
-          `@${saler.username}, ${notice.detail.brand} marka ürünü için sana özel ${price} TL'lik teklif verdi.`,
-          notification_types.offer,
-          new Date(),
-          [{item_id:notice.id, item_type: "notice"}]
-        )
-        socketServices.emitNotificationOneUser(notification,buyer.id);
-        return res.send(sendJsonWithTokens(req, error_types.success));
-
-  } catch (error) {
-    return next(error);
-  }
-
-})
-
-router.post("/accept_offer", async (req, res, next)=>{
-  const notice_id = req.body.notice_id;
-  const offer_id = req.body.offer_id;
-  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
-  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
-  if(!offer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"offer id")));
-  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,offer_id)));
-
-  try {
-    const notice = await noticeModel.findById(notice_id).select("saler_user offers profile_photo details.brand details.category.detail_category");
-    if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
-    if(notice.saler_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"the saler of this notice is not you.")));
-
-    const offer = notice.offers.id(offer_id);
-    if(!offer) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
-    if(offer.offer_state == offer_states.accepted) return next(new Error(error_handling_services(error_types.logicalError,"this offer is already accepted")));
-    if(offer.offer_state == offer_states.expired) return next(new Error(error_handling_services(error_types.logicalError,"this offer is expired")));
-    if(offer.offer_state == offer_states.declined) return next(new Error(error_handling_services(error_types.logicalError,"this offer is already declined")));
-    offer["offer_state"] = offer_states.accepted;
-    await notice.save();
-    const proposer = await user_model.findById(offer.proposer).select("buying_offers email");
-    const saler = await user_model.findById(req.decoded.id).select("username");
-    let buyerOffer; 
-    proposer.buying_offers.map((offer) => {
-      if(offer.notice == notice_id){
-        buyerOffer = offer;
-      }
-    });
-
-    if(!buyerOffer) return next(new Error(error_types.dataNotFound,"offer"));
-    buyerOffer["state"] = offer_states.accepted;
-    await proposer.save();
-    timeoutService.deleteOffer(notice_id, proposer.id);
-    mailServices.acceptOfferMail(proposer.email,saler.username,buyerOffer.price, notice.profile_photo, notice.details.brand, notice.details.category.detail_category,"http://localhost:3200/render");
-
-    const notification = new notificationModel(
-      "Teklifin kabul edildi!",
-      `@${saler.username}, ${notice.details.brand} marka ${notice.details.category.detail_category} ürünü için yaptığın teklifi kabul etti.`,
-      notification_types.offer,
-      new Date(),
-      [{item_id: notice_id, item_type: "notice"}]
-    );
-
-    socketServices.emitNotificationOneUser(notification,proposer._id);
-    return res.send(sendJsonWithTokens(req,error_types.success));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.post("/accept_saling_offer", async(req, res, next) => {
-  const notice_id = req.body.notice_id;
-  const offer_id = req.body.offer_id;
-  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
-  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
-  if(!offer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
-  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,offer_id)));
-
-  try {
-    const user = await user_model.findById(req.decoded.id).select("gotten_buying_offers username")
-    let offer; 
-
-    for await(let g_offer of user.gotten_buying_offers){
-      console.log(g_offer);
-      if(g_offer._id == offer_id){
-        offer = g_offer; 
-      }
-    }
-
-    if(!offer) return next(new Error("offer not found"));
-    if(offer.state == offer_states.accepted) return next(new Error(error_handling_services(error_types.logicalError,"this offer is already accepted")));
-    if(offer.state == offer_states.expired) return next(new Error(error_handling_services(error_types.logicalError,"this offer is expired")));
-    if(offer.state == offer_states.declined) return next(new Error(error_handling_services(error_types.logicalError,"this offer is declined ")));
-    offer["state"] = offer_states.accepted;
-    await user.save();
-    const notice = await noticeModel.findById(notice_id).select("saler_user profile_photo details.brand details.category.detail_category offers").populate("saler_user","email");
-
-    notice.offers.forEach( async offer => {
-      if(offer.proposer == offer.proposer && offer.offer_state == offer_states.pending && offer.offer_type == "sale"){
-        offer.offer_state = offer_states.accepted;
-        await notice_model.findOneAndUpdate({"_id": notice_id, "offers._id": offer._id}, {$set:{
-          "offers.$": offer
-        }});
-      }
-    });
-    // 
-    timeoutService.deleteSalingAcceptedOffer(notice.id,notice.saler_user.id, req.decoded.id);
-    mailServices.acceptSaleOfferMail(notice.saler_user.email, user.username, offer.price, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
-
-    const notification = new notificationModel(
-      "Satış teklifin kabul edildi!",
-      `@${user.username} ${ details.brand} marka ${details.category.detail_category} ürünün için verdiğin ${offer.price} TL'lik teklifi kabul etti.`,
-      notification_types.offer,
-      new Date(),
-      [{item_id:notice.id, item_type: "notice"}]
-    )
-    socketServices.emitNotificationOneUser(notification,notice.saler_user._id);
-    return res.send(sendJsonWithTokens(req,error_types.success));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.post("/decline_saling_offer", async(req, res, next) => {
-  const notice_id = req.body.notice_id;
-  const offer_id = req.body.offer_id;
-  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
-  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
-  if(!offer_id) return next(new Error(error_handling_services(error_types.dataNotFound,"offer id")));
-  if(!isValidObjectId(offer_id)) return next(new Error(error_handling_services(error_types.invalidValue,offer_id)));
-
-  try {
-    const user = await user_model.findById(req.decoded.id).select("gotten_buying_offers username")
-    let offer; 
-
-    for await(let g_offer of user.gotten_buying_offers){
-      console.log(g_offer);
-      if(g_offer._id == offer_id){
-        offer = g_offer; 
-      }
-    }
-
-    if(!offer) return next(new Error(error_handling_services(error_types.dataNotFound,"offer")));
-    if(offer.state == offer_states.accepted) return next(new Error(error_handling_services(error_types.logicalError,"this offer is already accepted")));
-    if(offer.state == offer_states.expired) return next(new Error(error_handling_services(error_types.logicalError,"this offer is expired")));
-    if(offer.state == offer_states.declined) return next(new Error(error_handling_services(error_types.logicalError,"this offer is declined")));
-    offer["state"] = offer_states.declined;
-    await user.save();
-    const notice = await noticeModel.findById(notice_id).select("saler_user profile_photo details.brand details.category.detail_category offers").populate("saler_user","email");
-
-    notice.offers.forEach( async offer => {
-      if(offer.proposer == offer.proposer && offer.offer_state == offer_states.pending && offer.offer_type == "sale"){
-        offer.offer_state = offer_states.declined;
-        await notice_model.findOneAndUpdate({"_id": notice_id, "offers._id": offer._id}, {$set:{
-          "offers.$": offer
-        }});
-      }
-    });
-    mailServices.declineSaleOfferMail(notice.saler_user.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/render");
-    
-
-    const notification = new notificationModel(
-      "Satış teklifin kabul reddedildi",
-      `@${user.username} ${ details.brand} marka ${details.category.detail_category} ürünün için verdiğin ${offer.price} TL'lik teklifi reddetti.`,
-      notification_types.offer,
-      new Date(),
-      [{item_id: notice.id,item_type: "notice"}]
-    )
-    socketServices.emitNotificationOneUser(notification,notice.saler_user._id);
-    return res.send(sendJsonWithTokens(req,error_types.success));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.post("/send_feedback", async (req, res, next)=>{
-  const feed_content = req.body.feedback_content;
-  const feed_subject = req.body.feedback_subject;
-  const feed_date = new Date();
-  const feed_reason = req.body.feedback_reason;
-
-  if(!Object.values(feedback_reasons).includes(feed_reason)){
-    return next(new Error(error_handling_services(error_types.invalidValue,feed_reason)));
-  }
-  if(!Object.values(feedback_subjects).includes(feed_subject)){
-    return next(new Error(error_handling_services(error_types.invalidValue,feed_subject)));
-  }
-  if(feed_content.length> 1400 || feed_content.length ==0){
-    return next(new Error(error_handling_services(error_types.invalidValue,"feedback text length must low than 1400 and mustn't equal 0")));
-  }
-
-  const newFeedback = new feedback_model({
-    feedback_reason: feed_reason,
-    feedback_subject: feed_subject,
-    feedback_content: feed_content,
-    feedback_date: feed_date,
-    user: req.decoded.id,
-  });
-
-  try {
-    const result = await newFeedback.save();
-    const savingFromUserSchema = await user_model.findByIdAndUpdate(req.decoded.id,{$addToSet: {feedbacks:  new ObjectId(result._id)}});
-    return res.send(sendJsonWithTokens(req, error_types.success));
-  } catch (error) {
-    return next(error);
-  }
-})
-
-router.get("/get_feedbacks", async (req, res, next)=>{
-  const result = await user_model.findById(req.decoded.id).select("feedbacks").populate("feedbacks");
-  return res.send(sendJsonWithTokens(req,result.feedbacks));
-})
-
 router.get("/get_taken_notices", async (req, res, next)=>{
   try {
     const result = await user_model.findById(req.decoded.id).select("taken_notices");
@@ -741,7 +413,6 @@ router.post("/add_looked_notice", async (req, res, next)=>{
       await result.updateOne({$pop: {user_looked_notices: 1},});
     }
 
-    await noticeModel.findByIdAndUpdate(notice_id,{$inc: {displayed_count: 1}});
     return res.send(sendJsonWithTokens(req, error_types.success));
 	  
   } catch (error) {

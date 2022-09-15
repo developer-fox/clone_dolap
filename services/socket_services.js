@@ -22,8 +22,7 @@ module.exports = (io)=>{
 
 	    io.to(socket.socket_id).emit("notification",{notification_data: {title: notificationModel.title,type: notificationModel.type }});
     } catch (error) {
-      console.log("hell");
-      throw error;
+      console.log(error);
     }
   }
   const emitActivationInfoToAnotherUsers = async function(user_id){
@@ -43,9 +42,6 @@ module.exports = (io)=>{
   const setNotificationSeenInfo = async function(notification_id){
     try {
       const socket = this;
-      console.log(socket.decoded.id);
-      console.log(socket.socket_id);
-      console.log(notification_id);
       
       if(typeof notification_id != "string" || !isValidObjectId(notification_id)){
         throw new Error("invalid notification id");

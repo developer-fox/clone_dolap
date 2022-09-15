@@ -9,7 +9,6 @@ const app = express();
 const socketManager = require("./services/socket_manager");
 const server = http.createServer(app);
 socketManager.initializeIo(server);
-const socket_services = require("./services/socket_services")(socketManager.getIo());
 
 // routes
 const  errorsMiddleware  = require('./controllers/error_handler_middleware');
@@ -20,9 +19,9 @@ const userRoutes = require("./routes/user_routes");
 const docsRoutes = require("./routes/docs_routes");
 const saleRoutes = require("./routes/sale_routes");
 const searchRoutes = require("./routes/search_routes");
-const notificationModel = require('./model/data_helper_models/notification_model');
-const error_types = require('./model/api_models/error_types');
-const error_handling_services = require('./services/error_handling_services');
+const offerRoutes = require("./routes/offer_routes");
+const reportRoutes = require("./routes/report_routes");
+const commentRoutes = require("./routes/comment_routes");
 
 //middlewares
 app.use(express.urlencoded({extended:false}));
@@ -45,7 +44,9 @@ app.use("/notice", jwtService.validateJwt, noticeRoutes);
 app.use("/user", jwtService.validateJwt, userRoutes);
 app.use("/sale", jwtService.validateJwt, saleRoutes);
 app.use("/search", jwtService.validateJwt, searchRoutes);
-
+app.use("/offer", jwtService.validateJwt, offerRoutes);
+app.use("/comment", jwtService.validateJwt, commentRoutes);
+app.use("/report", jwtService.validateJwt, reportRoutes);
 
 app.use(errorsMiddleware);
 
