@@ -119,14 +119,12 @@ router.post("/add_notice", async (req, res, next)=>{
 
 })
 
-router.post("/create_notice_photos",fileService.uploadNoticeImages,async (req, res, next)=>{
-  const paths = req.files.notice_images.map((file)=>{
-    let splitted = file.path.split("\\");
-    return `${process.env.URL}/docs/${splitted[1]}*${splitted[2]}*${splitted[3]}`;
-  })
-
+router.post("/create_notice_photos/:notice_id",fileService.requestPathsAddMiddleware, fileService.uploadNoticeImages,async (req, res, next)=>{
+  const paths = req.paths.map(path => {
+    return `https://${process.env.bucket_name}.s3.${process.env.region_name}.amazonaws.com/${path}`;
+  });
   try {
-    const notice = await noticeModel.findById(req.notice_id).select("photos profile_photo photos_replaced_count");
+    const notice = await noticeModel.findById(req.notice_id).select("photos profile_photo");
     await notice.updateOne({
       $push: {photos: paths},
       $set: {profile_photo: paths[0]},
@@ -135,28 +133,18 @@ router.post("/create_notice_photos",fileService.uploadNoticeImages,async (req, r
   } catch (error) {
     return next(error);
   }
-  
 })
 
-router.post("/update_notice_photos",fileService.updateNoticeImages,async(req, res, next)=>{
-  let notice_id = req.body.notice_id;
-  notice_id = JSON.parse(notice_id).id;
-  const paths = req.files.notice_images.map((file)=>{
-    let splitted = file.path.split("\\");
-    return `${process.env.URL}/docs/${splitted[1]}*${splitted[2]}*${splitted[3]}`; 
+router.post("/update_notice_photos/:notice_id",fileService.requestPathsAddMiddleware, fileService.deleteNoticeImagesMiddleware,fileService.updateNoticeImages,async(req, res, next)=>{
+  const paths = req.paths.map(path => {
+    return `https://${process.env.bucket_name}.s3.${process.env.region_name}.amazonaws.com/${path}`;
   });
   try {
-	  const notice = await noticeModel.findById(notice_id).select("photos profile_photo photos_replace_count")
-	  await fs.rm(`./files/notice/${notice_id}+${notice.photos_replace_count}`, { recursive: true }, err => {
-	    if (err) {
-	      throw err
-	    }
-	  });
-	  await notice.updateOne({
-	    $set: {photos: paths},
-	    $inc: {photos_replace_count: 1}
-	  })
-	  return res.send(sendJsonWithTokens(req,paths));
+    const notice = await noticeModel.findById(req.notice_id).select("photos profile_photo");
+    await notice.updateOne({
+      $set: {profile_photo: paths[0], photos: paths},
+    });
+    return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
   }

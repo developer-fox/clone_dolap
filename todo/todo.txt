@@ -4,3 +4,4 @@
 * update file actions
 * websocket jwt actions writing 
 * adding security solutions
+* notice photos update actions

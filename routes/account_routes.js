@@ -42,20 +42,12 @@ router.get("/get_profile_info", async (req, res, next)=>{
 })
 
 router.post("/change_profile_photo", fileService.updateUserImage,async (req, res, next)=>{
-  const path =   `${process.env.URL}/docs/user*${req.filePath.split("/")[2]}`;
+  const path = `https://${process.env.bucket_name}.s3.${process.env.region_name}.amazonaws.com/${req.profile_path}`;
   try {
-	  const user = await user_model.findById(req.decoded.id).select("profile_photo profile_photo_replace_count");
+	  const user = await user_model.findById(req.decoded.id).select("profile_photo");
 	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
-    if(user.profile_photo != ""){
-      await fs.rm(user.profile_photo, {recursive: true},err => {
-	      if (err) {
-	        return next(err);
-	      }
-	    });
-    }
     await user.updateOne({
       $set: {profile_photo: path},
-      $inc: {profile_photo_replace_count: 1}
     },{new: true});
 
     return res.send(sendJsonWithTokens(req,error_types.success));
@@ -64,26 +56,15 @@ router.post("/change_profile_photo", fileService.updateUserImage,async (req, res
   }  
 })
 
-router.delete("/delete_profile_photo",async(req, res, next) =>{
-
+router.delete("/delete_profile_photo",fileService.deleteUserProfilePhoto,async(req, res, next) =>{
   try {
-    const user = await user_model.findById(req.decoded.id).select("profile_photo profile_photo_replace_count");
-    if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
-    if(user.profile_photo == "") return next(new Errorerror_handling_services(error_types.logicalError,"user already have not profile photo"));
-    await fs.rm(user.profile_photo, {recursive: true},err => {
-      if (err) {
-        return next(err);
-      }
+    await user_model.findByIdAndUpdate(req.decoded.id,{
+      $set: {profile_photo: "https://dolap-backend-bucket.s3.eu-west-2.amazonaws.com/blank-user.jpg",}
     });
-    
-    await user.updateOne({
-      $set: {profile_photo: "",}
-    });
-    return res.send(sendJsonWithTokens(req,"successfuly"));
+    return res.send(sendJsonWithTokens(req, error_types.success));
   } catch (error) {
     return next(error);
   }
-
 })
 
 router.post("/change_profile_info", async (req, res, next)=>{

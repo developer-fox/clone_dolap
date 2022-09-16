@@ -51,6 +51,10 @@ app.use("/report", jwtService.validateJwt, reportRoutes);
 app.use(errorsMiddleware);
 
 
+app.use("/exam", async (req, res, next)=>{
+  res.redirect("https://dolap-backend-bucket.s3.eu-west-2.amazonaws.com/notice_images/6308731a8660f1fb095a9a94/bd53fdf2-54c0-4167-9c1c-0f4f2096d99a.jpg");
+})
+
 mongoose.connect(process.env.MONGODB_URL)
 .then(async (connection)=>{
   server.listen(process.env.PORT);

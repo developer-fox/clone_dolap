@@ -80,7 +80,6 @@ router.get("/get_user_notices/:page", async (req, res, next)=>{
   }
 })
 
-
 router.post("/follow_user", async (req, res, next)=>{
   let user_id = req.body.user_id;
   if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));

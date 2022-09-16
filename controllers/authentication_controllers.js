@@ -69,8 +69,8 @@ module.exports.loginController = async (req, res, next) => {
     return next(new Error(new Error(error_handling_services(error_types.invalidValue,req.url))));
   }
     const password = req.body.password;
-    const passwordCompare = await bcrypt.compare(password, userInDb.password);
-    //const passwordCompare = password === userInDb.password;
+    //const passwordCompare = await bcrypt.compare(password, userInDb.password);
+    const passwordCompare = password === userInDb.password;
     if(!passwordCompare){
       return next(new Error(new Error(error_handling_services(error_types.invalidValue,"password or email"))));
     }
