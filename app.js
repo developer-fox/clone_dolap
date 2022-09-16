@@ -15,13 +15,14 @@ const  errorsMiddleware  = require('./controllers/error_handler_middleware');
 const authenticationRoutes = require("./routes/authentication_routes");
 const accountRoutes = require("./routes/account_routes");
 const noticeRoutes = require("./routes/notice_routes");
-const userRoutes = require("./routes/user_routes");
-const docsRoutes = require("./routes/docs_routes");
+const otherUserRoutes = require("./routes/other_users_routes");
 const saleRoutes = require("./routes/sale_routes");
 const searchRoutes = require("./routes/search_routes");
 const offerRoutes = require("./routes/offer_routes");
 const reportRoutes = require("./routes/report_routes");
 const commentRoutes = require("./routes/comment_routes");
+const publicRoutes = require("./routes/public_routes");
+const ownedNoticeRoutes = require("./routes/owned_notice_routes");
 
 //middlewares
 app.use(express.urlencoded({extended:false}));
@@ -38,22 +39,18 @@ app.set("views", __dirname +"/templates");
 
 // routers
 app.use("/auth",authenticationRoutes);
-app.use("/docs",docsRoutes)
+app.use("/public", publicRoutes);
 app.use("/account", jwtService.validateJwt,accountRoutes);
 app.use("/notice", jwtService.validateJwt, noticeRoutes);
-app.use("/user", jwtService.validateJwt, userRoutes);
+app.use("/other_user", jwtService.validateJwt, otherUserRoutes);
 app.use("/sale", jwtService.validateJwt, saleRoutes);
 app.use("/search", jwtService.validateJwt, searchRoutes);
 app.use("/offer", jwtService.validateJwt, offerRoutes);
 app.use("/comment", jwtService.validateJwt, commentRoutes);
 app.use("/report", jwtService.validateJwt, reportRoutes);
+app.use("/report", jwtService.validateJwt, ownedNoticeRoutes);
 
 app.use(errorsMiddleware);
-
-
-app.use("/exam", async (req, res, next)=>{
-  res.redirect("https://dolap-backend-bucket.s3.eu-west-2.amazonaws.com/notice_images/6308731a8660f1fb095a9a94/bd53fdf2-54c0-4167-9c1c-0f4f2096d99a.jpg");
-})
 
 mongoose.connect(process.env.MONGODB_URL)
 .then(async (connection)=>{

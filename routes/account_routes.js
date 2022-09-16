@@ -23,23 +23,12 @@ const notice_model = require("../model/mongoose_models/notice_model");
 const mailServices = require("../services/mail_services");
 const socketManager = require("../services/socket_manager")
 const socketServices = require("../services/socket_services")(socketManager.getIo());
-const socket_model = require("../model/mongoose_models/socket_model");
-const notification_schema = require("../model/mongoose_models/notification_schema");
 const notificationModel = require("../model/api_models/notification_model");
 const notification_types = require("../model/data_helper_models/notification_types");
 const notification_items_getter = require("../controllers/notification_items_getter");
 const error_handling_services = require("../services/error_handling_services");
 const error_types = require("../model/api_models/error_types");
 
-
-router.get("/get_profile_info", async (req, res, next)=>{
-  try {
-	const user = await user_model.findById(req.decoded.id).select("profile_photo username phone_number email profile_description");
-	return res.send(sendJsonWithTokens(req,user));
-  } catch (error) {
-    return next(error);  
-  }
-})
 
 router.post("/change_profile_photo", fileService.updateUserImage,async (req, res, next)=>{
   const path = `https://${process.env.bucket_name}.s3.${process.env.region_name}.amazonaws.com/${req.profile_path}`;
@@ -169,51 +158,6 @@ router.get("/get_favorites/:page", async (req, res, next)=>{
   } catch (error) {
     return next(error);
   }  
-})
-
-router.post("/add_to_favorites", async (req, res, next)=>{
-  let idToBeAdded = req.body.new_favorite_notice_ids;
-  if(!idToBeAdded || idToBeAdded.length === 0) {
-    return next(new Error("invalid notice id(s)"));
-  }
-
-  const user = await user_model.findById(req.decoded.id).select("favorites");
-  if(!user) return next(new Error("user not found"));
-  
-  for await(let id of idToBeAdded) {
-    if(!mongoose.isValidObjectId(id)){
-      return next(new Error(new Error(error_handling_services(error_types.invalidValue,id))));
-    }
-    if(user.favorites.includes(id)){
-      return next(new Error(error_handling_services(error_types.logicalError,"this notice already in favorites list of user")));
-    }
-    const currentUser = await user_model.findById(req.decoded.id).select("username");
-    const noticeWithSaler = await notice_model.findById(id).select("saler_user details.brand details.category details_category");
-    const notification = new notificationModel(
-      "Bir ürünün beğenildi!",
-      `@${currentUser.username} ${noticeWithSaler.details.brand} marka ${noticeWithSaler.details.category.detail_category} ürününü beğendi!`,
-      notification_types.noticeLiked,
-      new Date(),
-      [{item_id: id, item_type: "notice"},{item_id: req.decoded.id, item_type: "user"}]
-    );
-
-    socketServices.emitNotificationOneUser(notification, noticeWithSaler._id);
-
-    await notice_model.findByIdAndUpdate(id, {
-      $addToSet: {
-        favorited_users: req.decoded.id
-      },
-      $inc: {favorites_count: 1}
-    });
-
-  }
-
-  try {
-	  await user_model.findByIdAndUpdate(req.decoded.id, {$push: {favorites: idToBeAdded}, $inc: {favorites_count: idToBeAdded.length}});
-    return res.send(sendJsonWithTokens(req, error_types.success));
-  } catch (error) {
-    return next(error);
-  }
 })
 
 router.get("/get_coupons", async (req, res, next)=>{
@@ -372,34 +316,6 @@ router.get("/get_taken_notices", async (req, res, next)=>{
   } catch (error) {
     return next(error);
   }
-})
-
-//TODO: 
-router.post("/add_looked_notice", async (req, res, next)=>{
-  const notice_id = req.body.notice_id;
-  if(!notice_id) return next(new Error("notice id cannot be empty"));
-  if(!isValidObjectId(notice_id)) return next(new Error("invalid notice id"));
-
-  try {
-	  const result = await user_model.findByIdAndUpdate(req.decoded.id, {
-	    $push: {
-	      user_looked_notices: {
-	        $position: 0, 
-	        $each : [notice_id],
-	      },
-	    }
-	  }, {new: true});
-	  
-    if( result.user_looked_notices.length === 10){
-      await result.updateOne({$pop: {user_looked_notices: 1},});
-    }
-
-    return res.send(sendJsonWithTokens(req, error_types.success));
-	  
-  } catch (error) {
-    return next(error);
-  }
-
 })
 
 router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{

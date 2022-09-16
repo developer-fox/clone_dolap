@@ -2,8 +2,6 @@
 
 
 const express = require("express");
-const { isValidObjectId } = require("mongoose");
-const user_model = require("../model/mongoose_models/user_model");
 const sold_notice_model = require("../model/mongoose_models/sold_notice_model");
 const router = express.Router();
 const uuid = require("uuid");
@@ -17,8 +15,13 @@ const socketManager = require("../services/socket_manager");
 const socketServices = require("../services/socket_services")(socketManager.getIo());
 const notification_types = require("../model/data_helper_models/notification_types");
 const notificationModel = require("../model/api_models/notification_model");
-const error_types = require("../model/api_models/error_types");
+const userModel = require('../model/mongoose_models/user_model');
+const user_model = require('../model/mongoose_models/user_model');
+const couponStates = require('../model/data_helper_models/coupon_states.js');
+const { default: mongoose, isValidObjectId } = require("mongoose");
 const error_handling_services = require("../services/error_handling_services");
+const error_types = require("../model/api_models/error_types");
+
 
 router.post('/check_cart', async(req, res, next)=>{
   const address_id = req.body.address_id;
@@ -285,5 +288,115 @@ router.get("/get_order_info_saler", async (req, res, next)=>{
     return next(error);
   }
 });
+
+router.get("/get_cart", async (req, res, next)=>{
+  try {
+	  const user = await userModel.findById(req.decoded.id).select("cart cart_items_count").populate("cart.items.notice","profile_photo title details.use_case details.size").populate("cart.items.notice.saler_user", "profile_photo saler_score username");
+	  
+	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
+	  let total_amount = 0;
+	  user.cart.items.forEach(element=>{
+	    total_amount += element.total_price;
+	  })
+	  user.cart.details.forEach(element=>{
+	    total_amount += element.amount;
+	  });
+	  return res.send(sendJsonWithTokens(req, {
+	    cart: user.cart,
+	    total_amount: total_amount,
+      cart_items_count: user.cart_items_count,
+	  }));
+  } catch (error) {
+    return next(error);
+  }
+})
+
+router.post("/use_coupon_code", async (req, res, next)=>{
+
+  const coupon_code = req.body.coupon_code;
+  if(!coupon_code) return next(new Error(error_handling_services(error_types.dataNotFound,"coupon code")));
+  try {
+	
+	  const user = await userModel.findById(req.decoded.id).select("user_coupons cart").populate("user_coupons.coupon");
+	
+	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
+	
+	  user.user_coupons.forEach(async element =>{
+	    if(element.coupon.code == coupon_code && !(element.is_used_before) && element.coupon.state == couponStates.usable){
+        await user.updateOne({
+          $addToSet: {
+            "cart.details": {
+              description: element.coupon.title,
+              amount: element.coupon.amount,
+              detail_id : element.coupon._id
+            }
+          }
+        });
+        return res.send(sendJsonWithTokens(req,error_types.success));
+      }
+	  });
+
+    return next(new Error(error_handling_services(error_types.dataNotFound,"coupon")));
+  } catch (error) {
+	  return next(error);
+  }
+})
+
+router.delete("/pop_to_cart", async(req, res, next)=>{
+  const element_id = req.body.element_id;
+  if(!element_id) return next(new Error(error_handling_services(error_types.dataNotFound,"element id")));
+  if(!isValidObjectId(element_id)) return next(new Error(error_handling_services(error_types.invalidValue,element_id)));
+  try {
+	  const user = await userModel.findById(req.decoded.id).select("cart");
+	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
+    console.log(user.cart.items);
+    for await(let item of user.cart.items){
+      if(item._id == element_id){
+
+        await user.updateOne({
+           $pull: {
+            "cart.items": {
+              _id: element_id
+            }
+           },
+          $inc: {
+            cart_items_count: -1
+          },
+        });
+        return res.send(sendJsonWithTokens(req,error_types.success));
+      }
+    };
+    return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
+  } catch (error) {
+	  return next(error);
+  }
+})
+
+router.delete("/pop_coupon_code", async (req, res, next)=>{
+  const coupon_id = req.body.coupon_id;
+  if(!coupon_id) return next(new Error(error_handling_services(error_types.dataNotFound,"coupon id")));
+  if(!isValidObjectId(coupon_id)) return next(new Error(error_handling_services(error_types.invalidValue,coupon_id)));
+
+  try {
+	  const user = await userModel.findOne(req.decoded.id).select("cart");	
+	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
+    
+    user.cart.details.forEach(async element => {
+      if(element.detail_id == coupon_id){
+        await user.update({
+          $pull: {
+            "cart.details":{
+              "cart.details.detail_id": coupon_id
+            }
+          }
+        });
+        return res.send(sendJsonWithTokens(req,error_types.success));
+      }
+    });
+
+  } catch (error) {
+	  return next(error);
+  }
+})
 
 module.exports = router;

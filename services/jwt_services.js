@@ -38,18 +38,40 @@ module.exports.validateJwt = async (req,res,next) => {
   }
 }
 
-module.exports.createJwtToken = (username, email, id)=>{
+module.exports.createJwtToken = (id)=>{
   // creating jsw token and hold username and email (expires 1 minute)
   const token = jwt.sign({id: id},process.env.JWT_SECRET_KEY,{expiresIn: "3h"})
   //creating jsw refresh token and for 5 days
   const refreshToken = jwt.sign({id: id}, process.env.JWT_REFRESH_SECRET_KEY, {expiresIn: "5d"});
   return {refresh_token: refreshToken, jwt_token: token};
 }
+module.exports.createJwtTokenForWebsockets = (id)=>{
+  // creating jsw token and hold username and email (expires 1 minute)
+  const token = jwt.sign({id: id},process.env.WEBSOCKET_JWT_SECRET_KEY,{expiresIn: "3h"})
+  //creating jsw refresh token and for 5 days
+  const refreshToken = jwt.sign({id: id}, process.env.WEBSOCKET_JWT_REFRESH_SECRET_KEY, {expiresIn: "5d"});
+  return {websocket_refresh_token: refreshToken, websocket_jwt_token: token};
+}
 
 module.exports.createNewJwtTokenWithRefreshToken = async (refreshToken)=>{
   try {
 	  const validatingRefreshToken = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET_KEY,);
     const newToken = jwt.sign({id: validatingRefreshToken.id},process.env.JWT_SECRET_KEY, {expiresIn: "3h"});
+    return newToken;
+  } catch (error) {
+    if(error.message == "jwt expired"){
+      //TODO: redirecting authentication again
+      throw new Error(error_handling_services(error_types.expiredRefreshToken,""));
+    }
+    else{
+      throw error;
+    }
+  }
+}
+module.exports.createNewJwtTokenWithRefreshTokenForWebsockets = async (refreshToken)=>{
+  try {
+	  const validatingRefreshToken = jwt.verify(refreshToken, process.env.WEBSOCKET_JWT_REFRESH_SECRET_KEY,);
+    const newToken = jwt.sign({id: validatingRefreshToken.id},process.env.WEBSOCKET_JWT_SECRET_KEY, {expiresIn: "3h"});
     return newToken;
   } catch (error) {
     if(error.message == "jwt expired"){

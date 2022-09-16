@@ -36,7 +36,7 @@ module.exports.initializeIo = (server)=>{
       }
       else{
         try {
-  	      const jwtValid = jsonwebtoken.verify(auth.jwt,process.env.JWT_SECRET_KEY);
+  	      const jwtValid = jsonwebtoken.verify(auth.jwt,process.env.WEBSOCKET_JWT_SECRET_KEY);
           socket.jwt = auth.jwt;
           socket.jwt_refresh = auth.jwt_refresh;
           socket.decoded = jwtValid;
@@ -44,8 +44,9 @@ module.exports.initializeIo = (server)=>{
         } catch (error) {
           if(error.message == "jwt expired"){
             try {
-              const new_jwt = await jwtService.createNewJwtTokenWithRefreshToken(auth.jwt_refresh);
+              const new_jwt = await jwtService.createNewJwtTokenWithRefreshTokenForWebsockets(auth.jwt_refresh);
               socket.jwt = new_jwt;
+              socket.is_replaced_jwt = true;
               socket.jwt_refresh = auth.jwt_refresh;
               socket.decoded = await jsonwebtoken.decode(new_jwt);
               next();
@@ -101,7 +102,9 @@ module.exports.initializeIo = (server)=>{
       // emits
       socketService.emitExample,
       socketService.emitNotificationOneUser,
-      socketService.emitActivationInfoToAnotherUsers
+      socketService.emitActivationInfoToAnotherUsers,
+      socketService.emitNewJwt
+      if(socket.is_replaced_jwt) socketService.emitNewJwt(socket.jwt, socket.decoded.id);
     }
 
     io.on("connection",onConnection);

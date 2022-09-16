@@ -34,8 +34,13 @@ module.exports.signupController = async function (req, res, next) {
     const username = req.body.username;
     const user = new newUser(username, password, email, phoneNumber);
     let current_user = await user.saveToDatabase();
-    const tokens = tokenService.createJwtToken(username, email, current_user._id);
-    return res.send(tokens);
+    const tokens = tokenService.createJwtToken(current_user._id);
+    const socketTokens = tokenService.createJwtTokenForWebsockets(current_user._id);
+    return res.send({
+      info: error_types.success,
+      tokens,
+      socketTokens
+    });
   } catch (error) {
     return next(error);
   }
@@ -75,10 +80,12 @@ module.exports.loginController = async (req, res, next) => {
       return next(new Error(new Error(error_handling_services(error_types.invalidValue,"password or email"))));
     }
 
-  const tokens = tokenService.createJwtToken(userInDb.username, userInDb.email, userInDb._id);
+  const tokens = tokenService.createJwtToken(userInDb._id);
+  const socketTokens = tokenService.createJwtTokenForWebsockets(userInDb._id);
   return res.send({
     info: error_types.success,
-    tokens
+    tokens,
+    socketTokens
   });
 }
 

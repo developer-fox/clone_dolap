@@ -1,7 +1,6 @@
 * notice detail_categories js object writing
 * deep linking
 * editing route positions
-* update file actions
-* websocket jwt actions writing 
 * adding security solutions
-* notice photos update actions
+* notice details update route
+* ban user routes

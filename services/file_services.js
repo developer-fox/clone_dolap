@@ -1,7 +1,5 @@
 
 const multer = require("multer");
-const fs = require("fs");
-const path = require("path");
 const uuid = require("uuid");
 const mongoose = require("mongoose");
 const notice_model = require("../model/mongoose_models/notice_model");

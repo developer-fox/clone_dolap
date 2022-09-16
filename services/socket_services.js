@@ -25,6 +25,15 @@ module.exports = (io)=>{
       console.log(error);
     }
   }
+  const emitNewJwt = async function(new_jwt,userId){
+    try {
+      const socket = await socket_model.findOne({user: userId});
+      if(!socket) throw new Error("socket id not found");
+	    io.to(socket.socket_id).emit("new_jwt",{new_jwt:new_jwt});
+    } catch (error) {
+      console.log(error);
+    }
+  }
   const emitActivationInfoToAnotherUsers = async function(user_id){
     try {
 	    const user = await user_model.findById(user_id).select("last_seen is_active");
@@ -128,6 +137,7 @@ module.exports = (io)=>{
     deactivateUser,
     listenUserActivation,
     abortListeningUserActivation,
-    emitActivationInfoToAnotherUsers  
+    emitActivationInfoToAnotherUsers,
+    emitNewJwt  
   };
 }
