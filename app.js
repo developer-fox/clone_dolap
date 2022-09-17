@@ -69,7 +69,6 @@ app.use("/offer", jwtService.validateJwt, offerRoutes);
 app.use("/comment", jwtService.validateJwt, commentRoutes);
 app.use("/report", jwtService.validateJwt, reportRoutes);
 app.use("/report", jwtService.validateJwt, ownedNoticeRoutes);
-
 app.get("/favicon.ico",(req, res, next)=>{
   return res.send("a favicon");
 })

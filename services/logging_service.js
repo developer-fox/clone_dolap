@@ -19,7 +19,7 @@ const logModel = mongoose.model("log",logSchema,"logs");
 const writeToDb = {
   write: (line) => {
     let [ip_address, request_method, url, status_code, response_time,x_access_token,request_body] = line.split(" ");
-    if(typeof response_time != "Number") response_time = -1;
+    if(Number.isNaN(Number.parseInt(response_time))) response_time = -1;
     const newLog = new logModel({ip_address: ip_address, request_method: request_method,url: url,status_code: status_code, response_time: response_time, x_access_token: x_access_token.trim(), request_body: request_body.trim()});
     newLog.save((err)=>{
       if(err) console.log(err);
