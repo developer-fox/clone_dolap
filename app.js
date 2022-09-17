@@ -82,7 +82,7 @@ app.use(errorsMiddleware);
 
 mongoose.connect(process.env.MONGODB_URL)
 .then(async (connection)=>{
-  server.listen(process.env.PORT);
+  server.listen(process.env.PORT || 3000);
 })
 .catch((err)=>{
   console.log(err);
