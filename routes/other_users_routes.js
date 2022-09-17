@@ -18,18 +18,6 @@ const notificationModel = require("../model/api_models/notification_model");
 const error_types = require('../model/api_models/error_types');
 const error_handling_services = require('../services/error_handling_services');
 
-router.get("/get_user_info", async (req, res, next) =>{
-  const user_id = req.body.user_id;
-  if(!user_id) return next(new Error(error_handling_services(error_types.dataNotFound,"user id")));
-  if(!mongoose.isValidObjectId(user_id)) return next(new Error(error_handling_services(error_types.invalidValue,user_id)));
-  try {
-	  const user = await userModel.findById(user_id).select("username profile_description profile_photo last_seen is_validated saler_score followers_count follows_count sold_notices_count favorites_count is_credible_saler average_send_time notices_count ratings_count");
-	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
-	  return res.send(sendJsonWithTokens(req, user));
-  } catch (error) {
-    return next(error);
-  }
-});
 
 router.get("/get_user_notices/:page", async (req, res, next)=>{
   const page = Number.parseInt(req.params.page);

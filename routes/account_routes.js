@@ -30,6 +30,15 @@ const error_handling_services = require("../services/error_handling_services");
 const error_types = require("../model/api_models/error_types");
 
 
+router.get("/profile_info", async (req, res, next)=>{
+  try {
+	const user = await user_model.findById(req.decoded.id).select("profile_photo username phone_number email profile_description");
+	return res.send(sendJsonWithTokens(req,user));
+  } catch (error) {
+    return next(error);  
+  }
+})
+
 router.post("/change_profile_photo", fileService.updateUserImage,async (req, res, next)=>{
   const path = `https://${process.env.bucket_name}.s3.${process.env.region_name}.amazonaws.com/${req.profile_path}`;
   try {
