@@ -35,5 +35,6 @@ morgan.token("body",(req,res)=>{
 })
 
 module.exports = morgan(":remote-addr :method :url :status :response-time[digits] :req[x-access-token] :body",{
+  skip: function(req,res) {return req.url == "/favicon.ico"},
   stream: writeToDb
 });
