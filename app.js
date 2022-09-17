@@ -70,7 +70,7 @@ app.use("/comment", jwtService.validateJwt, commentRoutes);
 app.use("/report", jwtService.validateJwt, reportRoutes);
 app.use("/report", jwtService.validateJwt, ownedNoticeRoutes);
 
-appp.get("/favicon.ico",(req, res, next)=>{
+app.get("/favicon.ico",(req, res, next)=>{
   return res.send("a favicon");
 })
 
@@ -82,7 +82,8 @@ app.use(errorsMiddleware);
 
 mongoose.connect(process.env.MONGODB_URL)
 .then(async (connection)=>{
-  server.listen(process.env.PORT || 3000);
+  const PORT = process.env.PORT || '8080';
+  server.listen(PORT);
 })
 .catch((err)=>{
   console.log(err);

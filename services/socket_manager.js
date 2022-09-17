@@ -22,9 +22,6 @@ module.exports.initializeIo = (server)=>{
   if(!server){
     throw new Error("server is not initialized")
   }
-  else if(!server instanceof http.Server){
-    throw new Error("wrong server type");
-  }
   else{
     io = socketio(server);
 
