@@ -1,5 +1,4 @@
 * notice detail_categories js object writing
 * deep linking
-* adding security solutions
 * notice details update route
 * ban user routes
