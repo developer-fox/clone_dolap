@@ -91,7 +91,7 @@ module.exports.loginController = async (req, res, next) => {
 
 module.exports.newPasswordController = async (req, res, next)=>{
   try {
-	 const user = await user_model.findOne({email: req.decodedJwt.email});
+	 const user = await user_model.findById(req.decoded.id);
 	  const passwordComparing = await bcrypt.compare(req.body.newPassword, user.password);
 	  if(passwordComparing){
 	    return next(new Error(error_handling_services(error_types.invalidValue,"password")));

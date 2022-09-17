@@ -2,3 +2,4 @@
 * deep linking
 * notice details update route
 * ban user routes
+* forgot password route
