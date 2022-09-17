@@ -4,8 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "nodemon run app.js"
+    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "developer-fox",
   "license": "ISC",
@@ -48,6 +47,6 @@
     "heroku"
   ],
   "engines": {
-    "node": "16.x"
+    "node": "16.14.0"
   }
 }
