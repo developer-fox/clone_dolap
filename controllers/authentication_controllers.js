@@ -36,7 +36,7 @@ module.exports.signupController = async function (req, res, next) {
     let current_user = await user.saveToDatabase();
     const tokens = tokenService.createJwtToken(current_user._id);
     const socketTokens = tokenService.createJwtTokenForWebsockets(current_user._id);
-    return res.send({
+    return res.status(200).send({
       info: error_types.success,
       tokens,
       socketTokens
