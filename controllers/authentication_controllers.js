@@ -20,7 +20,7 @@ module.exports.signupController = async function (req, res, next) {
   };
   let errors = validator.validationResult(req);
   if(!errors.isEmpty()){
-    return res.send(errors);
+    return res.status(400).send(errors);
   }
 
   try {
