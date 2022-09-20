@@ -12,6 +12,8 @@ const login_types = require("../model/api_models/login_types");
 const { sendJsonWithTokens } = require("../services/response_sendjson");
 const error_types = require("../model/api_models/error_types");
 const error_handling_services = require("../services/error_handling_services");
+const shortId = require("shortid");
+shortId.characters("0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ#$");
 
 module.exports.signupController = async function (req, res, next) {
   if(req.token != null){
@@ -31,7 +33,7 @@ module.exports.signupController = async function (req, res, next) {
     const password = await bcrypt.hash(req.body.password, 12);
     const email = req.body.email;
     const phoneNumber = req.body.phone_number;
-    const username = req.body.username;
+    const username = req.body.username ?? shortId.generate();
     const user = new newUser(username, password, email, phoneNumber);
     let current_user = await user.saveToDatabase();
     const tokens = tokenService.createJwtToken(current_user._id);

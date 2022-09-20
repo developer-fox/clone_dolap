@@ -12,7 +12,7 @@ const { sendJsonWithTokens } = require('../services/response_sendjson');
 const error_types = require('../model/api_models/error_types');
 const error_handling_services = require('../services/error_handling_services');
 
-router.post("/signup",validators.isEmail, validators.isPasswordPowerless,validators.isUsernameValid,validators.isPhoneNumberValid, controllers.signupController);
+router.post("/signup",validators.isEmail, validators.isPasswordPowerless,validators.isPhoneNumberValid, controllers.signupController);
 router.post("/login_with_username", validators.isUsernameValid, controllers.loginController);
 router.post("/login_with_email", validators.isEmail, controllers.loginController);
 router.post("/change_password", jwtService.validateJwt, validators.isNewPasswordPowerless, controllers.newPasswordController);

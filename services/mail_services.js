@@ -14,21 +14,23 @@ transporter.use("compile", mailerPug.pugEngine({
 
 module.exports.newCommentMail= (email,username,image_url, brand,saling_price,comment,category,deep_link)=>{
   try {
-	  transporter.sendMail({
-	    to: email,
-	    from: process.env.MAIL,
-	    subject: "Ürününe Yorum Yapıldı",
-	    template: "new_comment",
-	    ctx: {
-	      username: username,
-	      image_url :image_url,
-	      brand: brand,
-	      saling_price: saling_price,
-	      comment: comment,
-	      category: category,
-	      deep_link: deep_link 
-	    }
-	  });
+	  if(!email.split("@")[1].includes("example.com")){
+      transporter.sendMail({
+        to: email,
+        from: process.env.MAIL,
+        subject: "Ürününe Yorum Yapıldı",
+        template: "new_comment",
+        ctx: {
+          username: username,
+          image_url :image_url,
+          brand: brand,
+          saling_price: saling_price,
+          comment: comment,
+          category: category,
+          deep_link: deep_link 
+        }
+      });
+    }
   } catch (error) {
 	  throw error;
   }
@@ -36,7 +38,8 @@ module.exports.newCommentMail= (email,username,image_url, brand,saling_price,com
 
 module.exports.newAnswerMail = (email,username,image_url, brand,category,deep_link)=>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	    transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "Ürününe Yorum Yapıldı",
@@ -49,6 +52,7 @@ module.exports.newAnswerMail = (email,username,image_url, brand,category,deep_li
 	      deep_link: deep_link 
 	    }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -56,7 +60,8 @@ module.exports.newAnswerMail = (email,username,image_url, brand,category,deep_li
 
 module.exports.sendOfferToFavoritesMail = (email,offerer_username, image_url,brand,offer_price, category,deep_link) =>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "YENİ BİR TEKLİFİN VAR!",
@@ -70,6 +75,7 @@ module.exports.sendOfferToFavoritesMail = (email,offerer_username, image_url,bra
         deep_link: deep_link
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -86,7 +92,8 @@ module.exports.blankMail = ()=>{
 
 module.exports.newBuyingOfferMail = (email,offerer_username, image_url,brand,offer_price, category,deep_link) =>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "YENİ BİR TEKLİFİN VAR!",
@@ -100,6 +107,7 @@ module.exports.newBuyingOfferMail = (email,offerer_username, image_url,brand,off
         deep_link: deep_link
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -107,7 +115,8 @@ module.exports.newBuyingOfferMail = (email,offerer_username, image_url,brand,off
 
 module.exports.newSalingOffer = (email,offerer_username, image_url,brand,offer_price, category,deep_link) =>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "YENİ BİR SATIŞ TEKLİFİN VAR!",
@@ -121,6 +130,7 @@ module.exports.newSalingOffer = (email,offerer_username, image_url,brand,offer_p
         deep_link: deep_link
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -128,7 +138,8 @@ module.exports.newSalingOffer = (email,offerer_username, image_url,brand,offer_p
 
 module.exports.acceptOfferMail = (email,offerer_username, price,image_url,brand, category,deep_link) =>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: `@${offerer_username} TEKLİFİNİ KABUL ETTİ!`,
@@ -142,6 +153,7 @@ module.exports.acceptOfferMail = (email,offerer_username, price,image_url,brand,
         deep_link: deep_link
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -149,7 +161,8 @@ module.exports.acceptOfferMail = (email,offerer_username, price,image_url,brand,
 
 module.exports.acceptSaleOfferMail = (email,offerer_username, price,image_url,brand, category,deep_link) =>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "SATIŞ TEKLİFİN KABUL EDİLDİ!",
@@ -163,6 +176,7 @@ module.exports.acceptSaleOfferMail = (email,offerer_username, price,image_url,br
         deep_link: deep_link
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -170,7 +184,8 @@ module.exports.acceptSaleOfferMail = (email,offerer_username, price,image_url,br
 
 module.exports.declineSaleOfferMail = (email,offerer_username,image_url,brand, category,deep_link) =>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "SATIŞ TEKLİFİN REDDEDİLDİ",
@@ -183,27 +198,29 @@ module.exports.declineSaleOfferMail = (email,offerer_username,image_url,brand, c
         deep_link: deep_link
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
 }
 
-
 module.exports.declinedOfferMail = (email,offerer_username, image_url,brand, category,deep_link) =>{
   try {
-	  transporter.sendMail({
-	    to: email,
-	    from: process.env.MAIL,
-	    subject: "TEKLİFİN REDDEDİLDİ.",
-	    template: "decline_offer",
-	    ctx:{
-        username: offerer_username,
-        image_url :image_url,
-        brand: brand,
-        category: category,
-        deep_link: deep_link
-      }
-	  });
+if (!email.split("@")[1].includes("example.com")) {
+		  transporter.sendMail({
+		    to: email,
+		    from: process.env.MAIL,
+		    subject: "TEKLİFİN REDDEDİLDİ.",
+		    template: "decline_offer",
+		    ctx:{
+	        username: offerer_username,
+	        image_url :image_url,
+	        brand: brand,
+	        category: category,
+	        deep_link: deep_link
+	      }
+		  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -211,7 +228,8 @@ module.exports.declinedOfferMail = (email,offerer_username, image_url,brand, cat
 
 module.exports.priceCutEmail = (email, image_url,brand, category, old_price, new_price,size, deep_link)=>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "Beğendiğin ürünün fiyatı düştü!",
@@ -226,6 +244,7 @@ module.exports.priceCutEmail = (email, image_url,brand, category, old_price, new
         deep_link: deep_link
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -233,7 +252,8 @@ module.exports.priceCutEmail = (email, image_url,brand, category, old_price, new
 
 module.exports.newOrderMail = (email, image_url,salername,buyername,brand, amount,order_code,payer_of_cargo,contact_name,notice_deeplink, order_deeplink)=>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "Yeni Siparişin Var!",
@@ -251,6 +271,7 @@ module.exports.newOrderMail = (email, image_url,salername,buyername,brand, amoun
         image_url: image_url,
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -258,7 +279,8 @@ module.exports.newOrderMail = (email, image_url,salername,buyername,brand, amoun
 
 module.exports.newTakenNoticeMail = (email, image_url,buyername,brand, amount,order_code,payer_of_cargo,contact_name,notice_deeplink, order_deeplink)=>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "Siparişin Onaylandı!",
@@ -275,6 +297,7 @@ module.exports.newTakenNoticeMail = (email, image_url,buyername,brand, amount,or
         image_url: image_url,
       }
 	  });
+}
   } catch (error) {
 	  throw error;
   }
@@ -282,7 +305,8 @@ module.exports.newTakenNoticeMail = (email, image_url,buyername,brand, amount,or
 
 module.exports.emailValidationMail = (email,username,deep_link)=>{
   try {
-	  transporter.sendMail({
+	  if (!email.split("@")[1].includes("example.com")) {
+	transporter.sendMail({
 	    to: email,
 	    from: process.env.MAIL,
 	    subject: "E posta adresini onayla",
@@ -292,6 +316,7 @@ module.exports.emailValidationMail = (email,username,deep_link)=>{
         deep_link: deep_link,
       }
 	  });
+}
   } catch (error) {
 	  console.log(error);
   }
