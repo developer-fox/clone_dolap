@@ -1,5 +1,6 @@
 const express = require('express');
 const userModel = require('../model/mongoose_models/user_model');
+const noticeModel = require('../model/mongoose_models/notice_model');
 const brands = require('../model/data_helper_models/brands.json');
 const useCases = require('../model/data_helper_models/notice_use_cases');
 const colors = require('../model/data_helper_models/colors');
@@ -110,7 +111,7 @@ router.post("/add_notice", async (req, res, next)=>{
     await user_model.findByIdAndUpdate(req.decoded.id, {
       $set: {most_favorite_category_for_saling: await getUserMostFavoriteCategories.forSaling(req.decoded.id)}
     });  
-    return res.send(sendJsonWithTokens(req, error_types.success));
+    return res.send(sendJsonWithTokens(req, {notice_id: newNotice.id}));
   } catch (error) {
     return next(error);
   }
