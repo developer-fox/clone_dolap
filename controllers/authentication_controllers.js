@@ -27,6 +27,12 @@ module.exports.signupController = async function (req, res, next) {
 
   try {
     const search = await isEmailNotUsing(req.body.email);
+    if(req.body.username != null){
+      const usersOfSameUsernames = await user_model.find({username: req.body.username});
+      if(usersOfSameUsernames.length != 0){
+        return next(new Error(error_handling_services(error_types.logicalError,"this username is already using")));
+      }
+    }
     if(!search) {
       return next(new Error(error_handling_services(error_types.logicalError,"this email is already using")));
     }
