@@ -93,24 +93,6 @@ router.post("/add_notice", async (req, res, next)=>{
   try {
     const access = await newNotice.save();
 
-    const user = await userModel.findById(req.decoded.id).select("followers username");
-
-    for await(let follower of user.followers){
-      const notification = new notificationModel(
-        `@${user.username} yeni bir ürün ekledi.`,
-        `Takip ettiğin @${user.username}, dolabına yeni bir ürün ekledi!`,
-        notification_types.followingUserAddedNewNotice,
-        new Date(),
-        [{item_id: newNotice.id, item_type: "notice",},],
-      )
-      socketServices.emitNotificationOneUser(notification,follower);  
-    }
-    
-    const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {notices: access._id}, $inc: {notices_count: 1},},{new: true});
-    
-    await user_model.findByIdAndUpdate(req.decoded.id, {
-      $set: {most_favorite_category_for_saling: await getUserMostFavoriteCategories.forSaling(req.decoded.id)}
-    });  
     return res.send(sendJsonWithTokens(req, {notice_id: newNotice.id}));
   } catch (error) {
     return next(error);
@@ -123,11 +105,41 @@ router.post("/create_notice_photos/:notice_id",fileService.requestPathsAddMiddle
     return `https://${process.env.bucket_name}.s3.${process.env.region_name}.amazonaws.com/${path}`;
   });
   try {
-    const notice = await noticeModel.findById(req.notice_id).select("photos profile_photo");
+    const notice = await noticeModel.findById(req.notice_id).select("photos profile_photo details.brand");
     await notice.updateOne({
       $push: {photos: paths},
-      $set: {profile_photo: paths[0]},
+      $set: {
+        profile_photo: paths[0],
+        state: notice_states.takable
+      },
     });
+    
+    const user = await userModel.findById(req.decoded.id).select("followers username");
+
+    for await(let follower of user.followers){
+      const notification = new notificationModel(
+        `@${user.username} yeni bir ürün ekledi.`,
+        `Takip ettiğin @${user.username}, dolabına yeni bir ürün ekledi!`,
+        notification_types.followingUserAddedNewNotice,
+        new Date(),
+        [{item_id: notice.id, item_type: "notice",},],
+      )
+      socketServices.emitNotificationOneUser(notification,follower);  
+    }
+
+    const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {notices: access._id}, $inc: {notices_count: 1},},{new: true});
+    await user_model.findByIdAndUpdate(req.decoded.id, {
+      $set: {most_favorite_category_for_saling: await getUserMostFavoriteCategories.forSaling(req.decoded.id)}
+    });  
+
+    let userNotification = new notificationModel(
+      `${notice.details.brand} marka yeni ürünün onaylandı!`,
+      `${notice.details.brand} marka ürünün artık diğer kullanıcılar tarafından da görülebilir hale geldi.`,
+      notification_types.notifiedNewNotice,
+      new Date(),
+      [{item_id: notice.id, item_type: "notice"}],
+    );
+    socketServices.emitNotificationOneUser(userNotification,req.decoded.id)
     return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
