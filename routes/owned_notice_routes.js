@@ -64,7 +64,7 @@ router.post("/add_notice", async (req, res, next)=>{
     return next(new Error(error_handling_services(error_types.invalidValue,"cargo payer")));
   }
 
-  if(!req.body.data.price_details || !req.body.data.price_details.buying_price || !req.body.data.price_details.saling_price  || !req.body.data.price_details.selling_with_offer){
+  if(!req.body.data.price_details || !req.body.data.price_details.buying_price || !req.body.data.price_details.saling_price  || req.body.data.price_details.selling_with_offer == null){
     return next(new Error(error_handling_services(error_types.invalidValue,"price informations")));
   }
 
