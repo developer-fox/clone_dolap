@@ -127,7 +127,7 @@ router.post("/create_notice_photos/:notice_id",fileService.requestPathsAddMiddle
       socketServices.emitNotificationOneUser(notification,follower);  
     }
 
-    const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {notices: access._id}, $inc: {notices_count: 1},},{new: true});
+    const result = await user_model.findByIdAndUpdate(req.decoded.id, {$addToSet: {notices: req.notice_id}, $inc: {notices_count: 1},},{new: true});
     await user_model.findByIdAndUpdate(req.decoded.id, {
       $set: {most_favorite_category_for_saling: await getUserMostFavoriteCategories.forSaling(req.decoded.id)}
     });  
