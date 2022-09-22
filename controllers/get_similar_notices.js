@@ -2,7 +2,7 @@
 const noticeModel = require("../model/mongoose_models/notice_model");
 const notice_states=  require("../model/data_helper_models/notice_states");
 
-module.exports = async function(notice_id, selectedParameters,numberForEachSimilateLevel){
+module.exports = async function(notice_id, selectedParameters,numberForEachSimilateLevel,page){
   try {
 	  const notice = await noticeModel.findById(notice_id);
 	  if(!notice) throw new Error("notice not found");
