@@ -330,9 +330,9 @@ router.get("/get_taken_notices", async (req, res, next)=>{
 router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
   const page= req.params.page;
   const refresh = req.params.refresh;
-
+  
   const selectItems = "favorites_count details.brand profile_photo price_details.saling_price is_featured";
-  if (refresh) {
+  if (refresh == "true") {
 	  try {
 	    const userLookedNotices = await user_model.findById(req.decoded.id).select("user_looked_notices");
 	
@@ -366,7 +366,7 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
 	
   }
   try {
-    const populatedResult = await user_model.findOne(req.decoded.id).select("homepage_notices").populate({
+    const populatedResult = await user_model.findById(req.decoded.id).select("homepage_notices").populate({
       path: "homepage_notices",
       select: selectItems,
       options: {
