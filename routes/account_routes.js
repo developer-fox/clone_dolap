@@ -320,7 +320,14 @@ router.get("/get_sizes_spesific/:top_size/:medium_size", async (req, res, next)=
 
 router.get("/get_taken_notices", async (req, res, next)=>{
   try {
-    const result = await user_model.findById(req.decoded.id).select("taken_notices");
+    const result = await user_model.findById(req.decoded.id).select("taken_notices").populate({
+      path: "taken_notices",
+      select: "notice taken_date payment_total.amount states",
+      populate:  {
+        path: "notice",
+        select: "_id profile_photo"
+      }
+    })
     return res.send(sendJsonWithTokens(req,result));
   } catch (error) {
     return next(error);

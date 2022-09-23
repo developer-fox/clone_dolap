@@ -3,3 +3,5 @@
 * notice details update route
 * ban user routes
 * forgot password route
+* feature: saled notices removing from carts of other users
+* login with facebook & google
