@@ -65,7 +65,7 @@ router.post("/give_offer",async (req, res, next)=>{
       new Date(),
       [{item_id: notice._id.toString(), item_type: "notice"}],
     );
-    socketServices.emitNotificationOneUser(notification, notice.saler_user._id.toString());
+    socketServices.emitNotificationOneUser(notification, notice.saler_user.id.toString());
 
     for await (const likedUser of notice.favorited_users){
       const gaveUserNotification = new notificationModel(

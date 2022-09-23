@@ -18,8 +18,8 @@ const { sendJsonWithTokens } = require("../services/response_sendjson");
 const notificationModel = require("../model/api_models/notification_model");
 
 
-router.post("/add_to_favorites", async (req, res, next)=>{
-  const notice_id= req.body.notice_id;
+router.post("/add_to_favorites/:notice_id", async (req, res, next)=>{
+  const notice_id= req.params.notice_id;
 
   if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
   if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
@@ -29,7 +29,7 @@ router.post("/add_to_favorites", async (req, res, next)=>{
     if(user.favorites.includes(notice_id)){
       return next(new Error(error_handling_services(error_types.logicalError,"this notice is already favorited")));
     }
-    const result =  await userModel.findByIdAndUpdate(req.decoded.id, {$addToSet: {favorites:notice_id}}, {new: true});
+    const result =  await userModel.findByIdAndUpdate(req.decoded.id, {$addToSet: {favorites:notice_id}, $inc: {favorites_count: 1}}, {new: true});
     const notice = await noticeModel.findById(notice_id).select("saler_user");
     await noticeModel.findByIdAndUpdate(notice_id, {$inc: {favorites_count: 1}, $addToSet: {favorited_users: req.decoded.id}});
 
@@ -44,6 +44,27 @@ router.post("/add_to_favorites", async (req, res, next)=>{
       ],
     );
     socketServices.emitNotificationOneUser(notification, notice.saler_user.id);
+    return res.send(sendJsonWithTokens(req, error_types.success));
+  } catch (error) {
+    return next(error);
+  }
+
+})
+
+router.delete("/remove_from_favorites/:notice_id", async (req, res, next)=>{
+  const notice_id= req.params.notice_id;
+
+  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
+  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
+
+  try {
+    const user = await userModel.findById(req.decoded.id).select("favorites username");
+    if(user.favorites.includes(notice_id)== false){
+      return next(new Error(error_handling_services(error_types.logicalError,"this notice is not in your favorites")));
+    }
+    const result =  await userModel.findByIdAndUpdate(req.decoded.id, {$pull: {favorites:notice_id}, $inc: {favorites_count: -1}}, {new: true});
+    const notice = await noticeModel.findById(notice_id).select("saler_user");
+    await noticeModel.findByIdAndUpdate(notice_id, {$inc: {favorites_count: -1}, $pull: {favorited_users: req.decoded.id}});
     return res.send(sendJsonWithTokens(req, error_types.success));
   } catch (error) {
     return next(error);
@@ -156,51 +177,6 @@ router.post("/add_looked_notice", async (req, res, next)=>{
     return next(error);
   }
 
-})
-
-router.post("/add_to_favorites", async (req, res, next)=>{
-  let idToBeAdded = req.body.new_favorite_notice_ids;
-  if(!idToBeAdded || idToBeAdded.length === 0) {
-    return next(new Error("invalid notice id(s)"));
-  }
-
-  const user = await user_model.findById(req.decoded.id).select("favorites");
-  if(!user) return next(new Error("user not found"));
-  
-  for await(let id of idToBeAdded) {
-    if(!mongoose.isValidObjectId(id)){
-      return next(new Error(new Error(error_handling_services(error_types.invalidValue,id))));
-    }
-    if(user.favorites.includes(id)){
-      return next(new Error(error_handling_services(error_types.logicalError,"this notice already in favorites list of user")));
-    }
-    const currentUser = await user_model.findById(req.decoded.id).select("username");
-    const noticeWithSaler = await notice_model.findById(id).select("saler_user details.brand details.category details_category");
-    const notification = new notificationModel(
-      "Bir ürünün beğenildi!",
-      `@${currentUser.username} ${noticeWithSaler.details.brand} marka ${noticeWithSaler.details.category.detail_category} ürününü beğendi!`,
-      notification_types.noticeLiked,
-      new Date(),
-      [{item_id: id, item_type: "notice"},{item_id: req.decoded.id, item_type: "user"}]
-    );
-
-    socketServices.emitNotificationOneUser(notification, noticeWithSaler._id);
-
-    await notice_model.findByIdAndUpdate(id, {
-      $addToSet: {
-        favorited_users: req.decoded.id
-      },
-      $inc: {favorites_count: 1}
-    });
-
-  }
-
-  try {
-	  await user_model.findByIdAndUpdate(req.decoded.id, {$push: {favorites: idToBeAdded}, $inc: {favorites_count: idToBeAdded.length}});
-    return res.send(sendJsonWithTokens(req, error_types.success));
-  } catch (error) {
-    return next(error);
-  }
 })
 
 
