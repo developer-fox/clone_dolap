@@ -90,7 +90,9 @@ router.get("/get_saling_offers", async (req, res, next)=>{
 
     let offers = [];
     datas.notices.forEach((item) => {
-      offers.push(...item.offers);
+      let currentObject = {notice_id: item.id};
+      currentObject.offers= item.offers;
+      offers.push(currentObject);
     });
 
     return res.send(sendJsonWithTokens(req,offers));
