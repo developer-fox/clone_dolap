@@ -348,7 +348,7 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
   const refresh = req.params.refresh;
   page = Number.parseInt(page)
 
-  const selectItems = "favorites_count details.brand profile_photo price_details.saling_price is_featured";
+  const selectItems = "favorites_count details.brand saler_user profile_photo price_details.saling_price is_featured";
   if (refresh == "true") {
 	  try {
 	    const userLookedNotices = await user_model.findById(req.decoded.id).select("user_looked_notices");

@@ -3,9 +3,6 @@ const express = require('express');
 const mongoose = require('mongoose');
 const userModel = require('../model/mongoose_models/user_model');
 const { sendJsonWithTokens } = require('../services/response_sendjson');
-const user_report_reasons = require('../model/data_helper_models/user_report_reasons');
-const user_report_model = require('../model/mongoose_models/user_report_model');
-const soldNoticesModel = require('../model/mongoose_models/sold_notice_model');
 const notice_get_filters = require('../model/data_helper_models/notice_get_filters');
 const notice_get_sorting_parameters = require('../model/data_helper_models/notice_get_sorting_parameters');
 const router = express.Router();
@@ -104,6 +101,11 @@ router.post("/unfollow_user", async (req, res, next)=>{
 	  const currentUserFollowsList = await userModel.findById(req.decoded.id).select("follows follows_count");
     if(!currentUserFollowsList.follows.includes(user_id)) return next(new Error(error_handling_services(error_types.logicalError,"you already not following this user")));  
     await currentUserFollowsList.updateOne({$pull: {follows: user_id}, $inc: {follows_count: -1}});
+    await userModel.findByIdAndUpdate(user_id,  {
+      $pull: {followers: req.decoded.id},
+      $inc: {followers_count: -1}
+    })
+
     return res.send(sendJsonWithTokens(req,error_types.success));
   } catch (error) {
     return next(error);
