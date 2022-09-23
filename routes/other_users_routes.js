@@ -76,7 +76,11 @@ router.post("/follow_user", async (req, res, next)=>{
 	  const currentUser = await userModel.findById(req.decoded.id).select("follows follows_count username");
     if(currentUser.follows.includes(user_id)) return next(new Error(error_handling_services(error_types.logicalError,"you already following this user")));
     await currentUser.updateOne({$addToSet: {follows: user_id}, $inc: {follows_count: 1}});
-    
+    await userModel.findByIdAndUpdate(user_id,  {
+      $addToSet: {followers: req.decoded.id},
+      $inc: {followers_count: 1}
+    })
+
     const notification = new notificationModel(
       "Yeni bir takipçin var!",
       `@${currentUser.username} seni takip etmeye başladı.`,
