@@ -155,7 +155,7 @@ router.post("/cancel_buying", async (req, res, next)=>{
   try {
     const sold_notice = await sold_notice_model.findById(sold_notice_id).populate("notice","details.category.detail_category details.brand").populate("buyer_user","username");
     if(!sold_notice) return next(new Error(error_handling_services(error_types.dataNotFound,"sold notice")));
-    if(sold_notice.buyer_user != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you cannot cancel this sale")));
+    if(sold_notice.buyer_user.id != req.decoded.id) return next(new Error(error_handling_services(error_types.authorizationError,"you cannot cancel this sale")));
     if(sold_notice.states[[sold_notice.states.length-1]].state_type != sold_notice_states.approved) return next(new Error(error_handling_services(error_types.logicalError,"this sale is not cancelable")));
 
     await sold_notice.updateOne({
