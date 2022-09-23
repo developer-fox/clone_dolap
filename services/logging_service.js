@@ -5,6 +5,7 @@ const mongoose = require('mongoose');
 // log schema for logging datas
 const logSchema = new mongoose.Schema({
   ip_address: {type: String, required: true},
+  date: {type: Date, required: true},
   request_method : {type: String, required: true},
   url: {type: String, required: true},
   status_code: {type: String, required: true},
@@ -20,7 +21,7 @@ const writeToDb = {
   write: (line) => {
     let [ip_address, request_method, url, status_code, response_time,x_access_token,request_body] = line.split(" ");
     if(Number.isNaN(Number.parseInt(response_time))) response_time = -1;
-    const newLog = new logModel({ip_address: ip_address, request_method: request_method,url: url,status_code: status_code, response_time: response_time, x_access_token: x_access_token.trim(), request_body: request_body.trim()});
+    const newLog = new logModel({ip_address: ip_address, request_method: request_method,url: url,status_code: status_code, response_time: response_time, x_access_token: x_access_token.trim(), request_body: request_body.trim(), date: new Date()});
     newLog.save((err)=>{
       if(err) console.log(err);
     });
