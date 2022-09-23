@@ -96,7 +96,7 @@ router.post("/add_answer",  async (req, res, next)=>{
     mailServices.newAnswerMail(commenter_user.email, user.username, notice.profile_photo, notice.details.brand, notice.details.category.detail_category, "http://localhost:3200/pug");
 
     const notification = new notificationModel(
-      `@${user.username} soruna yorumuna cevap verdi!`,
+      `@${user.username} yorumuna cevap verdi!`,
       `"${content}"`,
       notification_types.comment,
       new Date(),

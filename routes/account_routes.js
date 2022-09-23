@@ -124,6 +124,15 @@ router.post("/change_profile_info", async (req, res, next)=>{
   }
 })
 
+router.get("/get_own_notices", async (req, res, next)=>{
+  try {
+    const result = await user_model.findById(req.decoded.id).select("notices").populate("notices")
+    return res.send(sendJsonWithTokens(req,result))
+  } catch (error) {
+    return next(error);
+  }
+})
+
 router.get("/get_addresses", async (req, res, next)=>{
   try {
 	const addresses = await user_model.findById(req.decoded.
