@@ -16,6 +16,7 @@ module.exports = {
   newFollower: "newFollower",
   rating: "rating",
   notifiedNewNotice: "notifiedNewNotice",
+  soldNoticeInYourCart: "soldNoticeInYourCart"
 }
 
 // offer items: [notice]
@@ -32,3 +33,4 @@ module.exports = {
 // newFollower items: [user]
 // rating items: [user, sold_notice]
 // notifiedNewNotice items: [notice]
+// soldNoticeInYourCart items: [notice]

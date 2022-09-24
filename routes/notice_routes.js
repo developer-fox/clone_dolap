@@ -91,7 +91,7 @@ router.post("/add_to_cart", async (req, res, next)=>{
   if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
 
   try {
-	const notice = await noticeModel.findById(notice_id).select("price_details.saling_price state size_of_cargo payer_of_cargo accepted_offers").populate("saler_user","_id");
+	const notice = await noticeModel.findById(notice_id).select("price_details.saling_price state details.size_of_cargo payer_of_cargo accepted_offers").populate("saler_user","_id");
   if(!notice) return next(new Error("notice not found"));
 	
   const currentUser = await userModel.findById(req.decoded.id).select("cart");
@@ -135,6 +135,13 @@ router.post("/add_to_cart", async (req, res, next)=>{
           break;
         }
       }
+
+      await noticeModel.findByIdAndUpdate(notice_id, {
+        $addToSet:  {
+          list_of_the_users_added_this_in_their_cart: currentUser.id
+        }
+      })
+
       await currentUser.updateOne({
         $addToSet: {
           "cart.details": {
@@ -167,7 +174,7 @@ router.post("/add_looked_notice", async (req, res, next)=>{
 	    }
 	  }, {new: true});
 	  
-    if( result.user_looked_notices.length === 10){
+    if( result.user_looked_notices.length === 20){
       await result.updateOne({$pop: {user_looked_notices: 1},});
     }
 

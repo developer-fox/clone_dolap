@@ -94,6 +94,11 @@ const noticeShema = new mongoose.Schema({
       },
       default: [],
     }],
+    list_of_the_users_added_this_in_their_cart: {
+      type: [mongoose.SchemaTypes.ObjectId],
+      default: [],
+      ref: "user"
+    } 
 });
 
 module.exports = mongoose.model("notice", noticeShema, "notices");

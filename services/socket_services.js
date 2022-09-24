@@ -1,4 +1,5 @@
-const { isValidObjectId } = require("mongoose");
+const { isValidObjectId , Types} = require("mongoose");
+const {ObjectId} = require("mongodb")
 const notification_types = require("../model/data_helper_models/notification_types");
 const socket_model = require("../model/mongoose_models/socket_model");
 const user_model = require("../model/mongoose_models/user_model");
@@ -10,10 +11,10 @@ module.exports = (io)=>{
   }
   const emitNotificationOneUser = async function(notificationModel,userId){
     try {
-      const socket = await socket_model.findOne({user: userId}).populate("user","notifications unseen_notifications_count");
+      const socket = await socket_model.findOne({user: Types.ObjectId(userId)}).populate("user","notifications unseen_notifications_count");
       if(!socket) throw new Error("socket id not found");
       const user = socket.user;
-      await user.updateOne({
+      await user_model.findByIdAndUpdate(user._id,{
         $addToSet: {
           notifications: notificationModel.modelToObject()
         },

@@ -63,19 +63,19 @@ router.post("/give_offer",async (req, res, next)=>{
       `@${proposer.username} ${notice.details.brand} marka ${notice.details.category.detail_category} ürünün için ${price} TL'lik bir teklif verdi.`,
       notification_types.offer,
       new Date(),
-      [{item_id: notice._id.toString(), item_type: "notice"}],
+      [{item_id: notice.id, item_type: "notice"}],
     );
-    socketServices.emitNotificationOneUser(notification, notice.saler_user.id.toString());
+    socketServices.emitNotificationOneUser(notification, notice.saler_user.id);
 
-    for await (const likedUser of notice.favorited_users){
+    for (const likedUser of notice.favorited_users){
       const gaveUserNotification = new notificationModel(
         "Beğendiğin ürüne teklif verildi!",
         `Beğendiğin ürüne teklif var, satılmak üzere, acele et!`,
         notification_types.anotherUserGaveOffer,
         new Date(),
-        [{item_id: notice._id.toString(), item_type: "notice"}],
+        [{item_id: notice.id, item_type: "notice"}],
       );
-      socketServices.emitActivationInfoToAnotherUsers(gaveUserNotification, likedUser._id);
+      socketServices.emitActivationInfoToAnotherUsers(gaveUserNotification, likedUser.id);
     }
 
     return res.send(sendJsonWithTokens(req,error_types.success));
@@ -303,7 +303,6 @@ router.post("/accept_saling_offer", async(req, res, next) => {
     let offer; 
 
     for await(let g_offer of user.gotten_buying_offers){
-      console.log(g_offer);
       if(g_offer._id == offer_id){
         offer = g_offer; 
       }
@@ -366,7 +365,6 @@ router.post("/decline_saling_offer", async(req, res, next) => {
     let offer; 
 
     for await(let g_offer of user.gotten_buying_offers){
-      console.log(g_offer);
       if(g_offer._id == offer_id){
         offer = g_offer; 
       }

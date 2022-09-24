@@ -211,7 +211,6 @@ router.post("/add_brands", async (req, res, next)=>{
 
   try {
 	  const result = await user_model.updateOne({email: req.decoded.email}, {$push: {brands: new_brands}});
-    console.log(result);
     return res.send(sendJsonWithTokens(req, error_types.success));
   } catch (error) {
     return next(error);
@@ -314,7 +313,6 @@ router.get("/get_sizes_spesific/:top_size/:medium_size", async (req, res, next)=
 
     for(let data of result.sizes){
       const i = data._doc;
-      console.log(i);
       if(i.top_size == top_size && i.medium_size == medium_size){
         sizes.push(i);
       }
@@ -354,7 +352,7 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
 	    const userLookedNotices = await user_model.findById(req.decoded.id).select("user_looked_notices");
       
       let promises = [];
-      if(userLookedNotices.user_looked_notices.length == 0){
+      if(userLookedNotices.user_looked_notices.length < 20){
           for(let i=0; i<30; i++){
             promises.push(
               new Promise(resolve=>{
@@ -385,7 +383,6 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
           result[randomIndex], result[currentIndex]];
       }
     
-      console.log(result);
       await userLookedNotices.updateOne({$set: {homepage_notices: result.map(notice=>{
         return notice._id;
       })}});

@@ -39,13 +39,13 @@ module.exports.signupController = async function (req, res, next) {
     const password = await bcrypt.hash(req.body.password, 12);
     const email = req.body.email;
     const phoneNumber = req.body.phone_number;
-    const username = req.body.username ?? shortId.generate();
+    const username = req.body.username ?? `MyDolap${shortId.generate()}`;
     const user = new newUser(username, password, email, phoneNumber);
     let current_user = await user.saveToDatabase();
     const tokens = tokenService.createJwtToken(current_user._id);
     const socketTokens = tokenService.createJwtTokenForWebsockets(current_user._id);
     return res.status(200).send({
-      info: error_types.success,
+      info: current_user.username,
       tokens,
       socketTokens
     });

@@ -3,7 +3,6 @@ const error_types = require("../model/api_models/error_types");
 
 module.exports = function (error,req, res, next) {
   for(let errorMessageString of definedErrorMessagesIncludedStrings){
-    error.message.includes(errorMessageString);
     if(error.message.includes(errorMessageString)){
       let statusCode = statusCodesLiteral(error.message);
       return res.status(statusCode).send(error.message);

@@ -27,9 +27,9 @@ router.post('/check_cart', async(req, res, next)=>{
   const address_id = req.body.address_id;
   if(!address_id) return next(new Error(error_handling_services(error_types.dataNotFound,"address id")));
   if(!isValidObjectId(address_id)) return next(new Error(error_handling_services(error_types.invalidValue,address_id)));
-  try {
-	  const currentUser = await user_model.findById(req.decoded.id).select("cart addresses user_coupons username email").populate("cart.items.notice");
 
+  try{
+	  const currentUser = await user_model.findById(req.decoded.id).select("cart addresses user_coupons username email").populate("cart.items.notice");
     if(!currentUser) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
     const address =currentUser.addresses.id(address_id);
     if(!address) return next(new Error(error_handling_services(error_types.dataNotFound,"address")));
@@ -39,22 +39,22 @@ router.post('/check_cart', async(req, res, next)=>{
       let total_amount = 0;
       const currentNotice = saled_notice.notice;
       const currentSaler = await user_model.findById(currentNotice.saler_user).select("username email sold_notices_count");
-      let main_amount = saled_notice.total_price;
 
       const payment_details = [
         {
           payment_amount: saled_notice.total_price,
           payment_title: "ürün fiyatı"
         },  
-        ...currentUser.cart.details.map(detail =>{
-          if(detail.detail_id == saled_notice.notice._id){
-            return {
-              payment_amount: detail.amount,
-              payment_title: detail.description
-            }
-          }
-        })
       ];
+
+      currentUser.cart.details.forEach(detail =>{
+        if(detail.detail_id == saled_notice.notice._id){
+          payment_details.push({
+            payment_amount: detail.amount,
+            payment_title: detail.description
+          })
+        }
+      });
       payment_details.forEach(e=> total_amount += e.payment_amount);
       const order_code = uuid.v4();
       const soldNotice = new sold_notice_model({
@@ -103,6 +103,27 @@ router.post('/check_cart', async(req, res, next)=>{
       mailServices.newTakenNoticeMail(currentUser.email,currentNotice.profile_photo,currentUser.usename,currentNotice.details.brand,total_amount,order_code,currentNotice.payer_of_cargo,`${address.contact_informations.name} ${address.contact_informations.name}`,"http://localhost:3200/render","http://localhost:3200/render");
       timeoutService.soldNoticeToCargo(soldNotice.id);
 
+            
+      for(let addedUser of currentNotice.list_of_the_users_added_this_in_their_cart){
+        await userModel.findByIdAndUpdate(addedUser, {
+          $pull: {
+            "cart.items": {
+              notice: currentNotice._id
+            }
+          }
+        })
+        if(addedUser != currentUser.id){
+          notification = new notificationModel(
+            `Sepetindeki ürünlerden birisi satıldı.`,
+            `${currentNotice.details.brand} marka ürün satıldığı için sepetinden çıkarıldı.`,
+            notification_types.soldNoticeInYourCart,
+            new Date(),
+            [{item_id: currentNotice.id, item_type: "notice"}]
+          )
+          socketServices.emitNotificationOneUser(notification, addedUser)
+        }
+      }
+
       if(currentSaler.sold_notices_count == 0){
         const firstSaleNotification= new notificationModel(
           "Tebrikler, ilk siparişini aldın!",
@@ -142,7 +163,8 @@ router.post('/check_cart', async(req, res, next)=>{
     });
 
     return res.send(sendJsonWithTokens(req,error_types.success));
-  } catch (error) {
+  } 
+  catch (error) {
     return next(error);
   }
 })
@@ -349,10 +371,13 @@ router.delete("/pop_to_cart", async(req, res, next)=>{
   try {
 	  const user = await userModel.findById(req.decoded.id).select("cart");
 	  if(!user) return next(new Error(error_handling_services(error_types.dataNotFound,"user")));
-    console.log(user.cart.items);
     for await(let item of user.cart.items){
       if(item._id == element_id){
-
+        await notice_model.findByIdAndUpdate(element_id, {
+          $pull: {
+            list_of_the_users_added_this_in_their_cart: user.id
+          }
+        })
         await user.updateOne({
            $pull: {
             "cart.items": {
