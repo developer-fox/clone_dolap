@@ -102,7 +102,6 @@ router.post('/check_cart', async(req, res, next)=>{
 
       mailServices.newTakenNoticeMail(currentUser.email,currentNotice.profile_photo,currentUser.usename,currentNotice.details.brand,total_amount,order_code,currentNotice.payer_of_cargo,`${address.contact_informations.name} ${address.contact_informations.name}`,"http://localhost:3200/render","http://localhost:3200/render");
       timeoutService.soldNoticeToCargo(soldNotice.id);
-
             
       for(let addedUser of currentNotice.list_of_the_users_added_this_in_their_cart){
         await userModel.findByIdAndUpdate(addedUser, {
@@ -110,6 +109,12 @@ router.post('/check_cart', async(req, res, next)=>{
             "cart.items": {
               notice: currentNotice._id
             }
+          },
+          $pop: {
+            "cart.details": -1
+          },
+          $inc: {
+            cart_items_count: -1
           }
         })
         if(addedUser != currentUser.id){

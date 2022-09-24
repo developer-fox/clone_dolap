@@ -28,7 +28,7 @@ router.get("/notice_details/:notice_id",async (req, res, next)=>{
 	  if(!notice_id) return next(new Error(error_handling_services(error_types.dataNotFound,"notice id")));
 	  if(!isValidObjectId(notice_id)) return next(new Error(error_handling_services(error_types.invalidValue,notice_id)));
 	
-	  const notice = await noticeModel.findById(notice_id).select("-price_details.buying_price -offers -photos_replace_count -offers_count -accepted_offers").populate("saler_user","profile_photo username is_validated saler_score").populate("favorited_users", "profile_photo username");
+	  const notice = await noticeModel.findById(notice_id).select("-price_details.buying_price -offers -photos_replace_count -offers_count -accepted_offers -list_of_the_users_added_this_in_their_cart").populate("saler_user","profile_photo username is_validated saler_score").populate("favorited_users", "profile_photo username");
     if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
     await notice.updateOne({
 	    $inc: {displayed_count: 1},
