@@ -7,6 +7,9 @@ const user_model = require("../model/mongoose_models/user_model");
 const notice_states = require("../model/data_helper_models/notice_states");
 const sold_notice_model = require("../model/mongoose_models/sold_notice_model");
 const saled_notice_states = require("../model/data_helper_models/saled_notice_states");
+const notificationModel = require("../model/api_models/notification_model")
+const socketManager = require("../services/socket_manager");
+const socketService = require("../services/socket_services")(socketManager.getIo())
 
 module.exports.deleteOffer = (notice_id, proposer_id) => {
   setTimeout(async() => {
@@ -133,7 +136,7 @@ module.exports.soldNoticeToCargo = (sold_notice_id)=>{
           new Date(),
           [{item_id: sold_notice_id, item_type:"sold_notice"}]
         );
-        socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user);
+        socketService.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user);
 
         this.soldNoticeToDelivered(sold_notice_id);
       }
@@ -167,7 +170,7 @@ module.exports.soldNoticeToDelivered = (sold_notice_id)=>{
         new Date(),
         [{item_id: sold_notice_id, item_type:"sold_notice"}]
         );
-      socketServices.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user.id);
+      socketService.emitNotificationOneUser(buyerNotification, sold_notice.buyer_user.id);
     } catch (error) {
       throw error;
     }  

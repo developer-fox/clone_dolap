@@ -197,8 +197,9 @@ router.post("/add_rating", async(req, res, next) => {
   try {
     const rater_user = await userModel.findById(req.decoded.id).select("username");
     let total_rating = (communication_rate + validity_rate + packing_rate)/3;
-    const notice = await soldNoticesModel.findById(sold_notice_id).select("notice saler_user buyer_user payment_total.amount").populate("notice","profile_photo title");
+    const notice = await soldNoticesModel.findById(sold_notice_id).select("notice saler_user buyer_user payment_total.amount is_rated").populate("notice","profile_photo title");
     if(!notice) return next(new Error(error_handling_services(error_types.dataNotFound,"notice")));
+    if(notice.is_rated == true) return next(new Error(error_handling_services(error_types.logicalError,"you already rated this user")));
     const user = await userModel.findById(user_id).select("username profile_photo saler_score ratings");
     if(!user) return next(new Error(error_handling_services(error_types.dateNotFound,"user")));
     if(notice.saler_user != user._id) return next(new Error(error_handling_services(error_types.invalidValue,"saler user")));

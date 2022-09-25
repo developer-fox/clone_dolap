@@ -33,6 +33,7 @@ const _schema = new mongoose.Schema({
     amount: {type: Number, required: true},
     payment_type: {type: String, required: true},
   },
+  is_rated: {type: Boolean, default: false},
   // card informations be add later
   //card_information: 
 })

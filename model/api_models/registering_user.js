@@ -8,6 +8,7 @@ class newUser{
     this.password = password;
     this.phone_number = phone_number;
     this.username = username;
+    this.last_seen = new Date();
   }
 
   async saveToDatabase(){

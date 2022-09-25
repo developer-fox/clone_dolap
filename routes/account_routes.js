@@ -332,7 +332,7 @@ router.get("/get_taken_notices", async (req, res, next)=>{
       select: "notice taken_date payment_total.amount states",
       populate:  {
         path: "notice",
-        select: "_id profile_photo"
+        select: "_id profile_photo saler_user"
       }
     })
     return res.send(sendJsonWithTokens(req,result));
@@ -356,9 +356,9 @@ router.get("/get_home_notices/:page/:refresh",async (req, res, next)=>{
           for(let i=0; i<30; i++){
             promises.push(
               new Promise(resolve=>{
-                noticeModel.count().exec(async(err,count)=>{
+                noticeModel.count({state: notice_states.takable}).exec(async(err,count)=>{
                   let randomNumber = Math.floor(Math.random() * count)
-                  noticeModel.findOne().skip(randomNumber).exec(async(err, notice)=>{
+                  noticeModel.findOne({state: notice_states.takable}).skip(randomNumber).exec(async(err, notice)=>{
                     resolve(notice);
                   })
                 })
